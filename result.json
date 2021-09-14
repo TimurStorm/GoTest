@@ -1,0 +1,43 @@
+{
+ "Results": [
+  {
+   "Url": "https://fabulae.ru/prose_b.php?id=117958",
+   "Words": [
+    "меня",
+    "Владимир",
+    "мастер"
+   ],
+   "Count": [
+    18,
+    13,
+    11
+   ]
+  },
+  {
+   "Url": "https://fabulae.ru/prose_b.php?id=75081",
+   "Words": [
+    "собак",
+    "Миша",
+    "Кинг"
+   ],
+   "Count": [
+    27,
+    18,
+    18
+   ]
+  },
+  {
+   "Url": "https://www.rfc-editor.org/rfc/rfc172.txt",
+   "Words": [
+    "file",
+    "data",
+    "transfer"
+   ],
+   "Count": [
+    81,
+    54,
+    44
+   ]
+  }
+ ]
+}
