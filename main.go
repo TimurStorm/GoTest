@@ -43,6 +43,7 @@ func main() {
 		result := Result{Url: url, Words: words, Count: count}
 		file.Results = append(file.Results, result)
 	}
+	// Запись в .json файл
 	data, _ := json.MarshalIndent(file, "", " ")
 	_ = ioutil.WriteFile("result.json", data, 0644)
 	runtime.ReadMemStats(memStats)

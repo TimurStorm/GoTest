@@ -8,7 +8,10 @@ import (
 )
 
 func GetUrls(filename string) map[int]string {
+	// Для урлов
 	var urls = make(map[int]string)
+
+	// Открываем файл
 	file, err := os.Open(filename + ".txt")
 	if err != nil {
 		fmt.Println(err)
@@ -17,6 +20,7 @@ func GetUrls(filename string) map[int]string {
 	defer file.Close()
 	var count = 0
 
+	// Инициализируем сканер и считываем построчно
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -28,6 +32,7 @@ func GetUrls(filename string) map[int]string {
 }
 
 func SendRequest(url string) *http.Response {
+	// Отправляем запрос
 	responce, err := http.Get(url)
 	if err != nil {
 		fmt.Println(err)

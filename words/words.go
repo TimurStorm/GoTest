@@ -37,32 +37,32 @@ func GetWordsCount(text string) ([3]string, [3]int) {
 		return r == ':' || r == '.' || r == ' ' || r == ',' || r == '!' || r == '?' || r == '-' || r == '<' || r == '>' || r == '_' || r == '(' || r == ')'
 	}
 
-	//Для уникальных слов
+	// Уникальные слова
 	var data []string
 
-	//Наибольшее количество упомянаний
+	// Наибольшее количество упомянаний
 	var max_count int = 0
 
-	//Итоговые топ 3 слова
+	// Итоговые топ 3 слова
 	var res_words [3]string
 
-	//Итоговое число упомянаний топ 3 слов
+	// Итоговое число упомянаний топ 3 слов
 	var res_count [3]int
 
-	//Для определения самых популярных
+	// Для определения самых популярных
 	word_count := make(map[int][]string)
 
 	//Получаем все слова из текста
 	all_words := strings.FieldsFunc(text, split)
 
-	//Определяем все уникальные слова
+	// Определяем все уникальные слова
 	for _, word := range all_words {
 		if utf8.RuneCountInString(word) > 3 && is_word(word) && !contain_string(data, word) {
 			data = append(data, word)
 		}
 	}
 
-	//Классификация слов по популярности
+	// Классификация слов по популярности
 	for _, word := range data {
 		c := strings.Count(text, word)
 		word_count[c] = append(word_count[c], word)
@@ -71,7 +71,7 @@ func GetWordsCount(text string) ([3]string, [3]int) {
 		}
 	}
 
-	//Отбираем топ 3 слова
+	// Отбираем топ 3 слова
 	for node_count := 0; node_count < 3 && max_count != 0; {
 		if _, ok := word_count[max_count]; ok {
 			for _, word := range word_count[max_count] {
@@ -90,20 +90,20 @@ func GetWordsCount(text string) ([3]string, [3]int) {
 }
 
 func GetText(responce *http.Response, default_tags string) string {
-	//Результат
+	// Результат
 	var text string
 
-	//Тег для поиска информации
+	// Тег для поиска информации
 	var tag string = default_tags
 
-	//Считываем тело запроса
+	// Считываем тело запроса
 	doc, _ := goquery.NewDocumentFromReader(responce.Body)
 
-	//Считываем тег
+	// Считываем тег
 	fmt.Println("Введите тег для получения конкретной информации (например: 'a') или 'body' для полной информации:")
 	fmt.Scan(&tag)
 
-	//Для каждого тега в файле получаем его html-вёрстку, из которой
+	// Для каждого тега в файле получаем его html-вёрстку, из которой
 	doc.Find(tag).Each(func(index int, item *goquery.Selection) {
 		html, _ := item.Html()
 		t, _ := html2text.FromString(html, html2text.Options{OmitLinks: true})
