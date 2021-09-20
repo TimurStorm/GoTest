@@ -12,7 +12,7 @@ go tool cover -func cov.out                  - view coverage in console
 3) [gocritic](https://github.com/go-critic/go-critic) 
 
 ### Linters:
-`gocritic check main.go`
-`golint main.go`
-`go vet main.go`
-`go fmt main.go` 
+* `gocritic check main.go` - go-critic
+* `golint main.go`         - golint
+* `go vet main.go`         - vet
+* `go fmt main.go`         - fmt
