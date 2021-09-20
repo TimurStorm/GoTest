@@ -1,6 +1,6 @@
 # GoTest
 ### Useful commands:
-```golang
+```
 go run main.go                               - start programm
 go test -coverprofile cov.out ./words        - test coverage
 go tool cover -html cov.out                  - view coverage in browser
