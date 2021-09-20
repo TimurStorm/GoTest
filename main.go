@@ -2,90 +2,62 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"main/result"
 	"main/words"
 )
 
-var wg sync.WaitGroup
-
-func process(url string, data *[]map[string]interface{}, defaultTag ...string) {
-
-	var tag string
-
-	if defaultTag[0] != "" {
-		tag = defaultTag[0]
-	}
-
-	fmt.Printf("REQUEST %v \n", url)
-	// Отправляем запрос
-	resp, respErr := http.Get(url)
-	if respErr != nil {
-		fmt.Println("Ошибка отправки запроса: ", respErr)
-	} else {
-		// Получаем текст страницы
-		text, textErr := words.GetText(resp, tag)
-		if textErr != nil {
-			fmt.Println("Ошибка получения текста: ", textErr)
-		} else {
-			// Получаем топ 3 упомянаемых слова с колиством упомянаний
-			words, count := words.GetWordsCount(text)
-
-			// Сохраняем полученные данные
-			result := map[string]interface{}{
-				"url":   url,
-				"words": words,
-				"count": count,
-			}
-			*data = append(*data, result)
-		}
-	}
-	wg.Done()
-}
-
 func main() {
+	// Группа ожидания для горутин
+	var wg sync.WaitGroup
+	// Используем 1 ядро процессора
 	runtime.GOMAXPROCS(1)
+	// Для измерения времени
 	start := time.Now()
-
-	data := []map[string]interface{}{}
-	// Открываем файл
+	// Массив результирующих данных
+	var data []words.Result
+	// Открываем файл с урлами
 	urlFile, urlErr := os.Open("stres_test.txt")
 	if urlErr != nil {
 		fmt.Println("Ошибка считывания файла с url:", urlErr)
 	}
+	// Открываем файл с результатами
 	jsonFile, jsonErr := os.Create("result.json")
 	if jsonErr != nil {
 		fmt.Println("Ошибка считывания файла с url:", jsonErr)
 	}
 
 	defer urlFile.Close()
+	defer jsonFile.Close()
 
-	// Инициализируем сканер и считываем построчно
+	// Инициализируем сканер
 	scanner := bufio.NewScanner(urlFile)
-	count := 1
+	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
 		wg.Add(1)
 		var tag string
 		row := strings.Split(scanner.Text(), ",")
 		url := row[0]
+		// Если указан необходимый тег в файле
 		if len(row) == 2 {
 			tag = row[1]
 		}
-		go process(url, &data, tag)
-
-		count++
+		go words.GetTopData(url, &data, wg, tag)
 	}
 
+	// Ждём выолнения всех горутин
 	wg.Wait()
-	encoder := json.NewEncoder(jsonFile)
-	encoder.Encode(data)
+	// Запись результатов в файл
+	encodeErr := result.PrettyWriteJSON(jsonFile, data)
+	if encodeErr != nil {
+		fmt.Println("Ошибка записи результата: ", encodeErr)
+	}
+	// Вывод затраченного времени
 	fmt.Printf("Time spend: %v", time.Since(start))
-
 }

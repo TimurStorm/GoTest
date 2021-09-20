@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
 	"jaytaylor.com/html2text"
 )
+
+type Result struct {
+	Url   string
+	Words [3]string
+	Count [3]int
+}
 
 func spliter(s string, splits string) []string {
 	m := make(map[rune]int)
@@ -24,8 +31,37 @@ func spliter(s string, splits string) []string {
 	return strings.FieldsFunc(s, splitter)
 }
 
-// GetWordsCount Возвращает топ 3 слов текста
-func GetWordsCount(text string) ([3]string, [3]int) {
+// GetTopData записывает в массив интерфейс с топ 3 словами и их количеством на странице
+func GetTopData(url string, data *[]Result, wg sync.WaitGroup, defaultTag ...string) {
+	var tag string
+
+	if defaultTag[0] != "" {
+		tag = defaultTag[0]
+	}
+
+	fmt.Printf("REQUEST %v \n", url)
+	// Отправляем запрос
+	resp, respErr := http.Get(url)
+	if respErr != nil {
+		fmt.Println("Ошибка отправки запроса: ", respErr)
+	} else if resp.StatusCode == 200 {
+		text, textErr := getText(resp, tag)
+		if textErr != nil {
+			fmt.Println("Ошибка получения текста: ", textErr)
+		} else {
+			// Получаем топ 3 упомянаемых слова с колиством упомянаний
+			words, count := getWordsCount(text)
+
+			// Сохраняем полученные данные
+			result := Result{url, words, count}
+			*data = append(*data, result)
+		}
+	}
+	wg.Done()
+}
+
+// getWordsCount Возвращает топ 3 слов текста
+func getWordsCount(text string) ([3]string, [3]int) {
 	// Вспомогательная функция: проверка на принадлежность строки к массиву
 	containString := func(list []string, substing string) bool {
 		for _, value := range list {
@@ -61,7 +97,7 @@ func GetWordsCount(text string) ([3]string, [3]int) {
 	// Для определения самых популярных
 	wordCount := make(map[int][]string)
 
-	//Получаем все слова из текста
+	// Получаем все слова из текста
 	allWords := spliter(text, " -.,?!()<>_")
 
 	// Определяем все уникальные слова
@@ -98,8 +134,8 @@ func GetWordsCount(text string) ([3]string, [3]int) {
 	return resWords, resCount
 }
 
-// GetText возвращает текст запроса
-func GetText(responce *http.Response, defaultTag ...string) (string, error) {
+// getText возвращает текст запроса
+func getText(responce *http.Response, defaultTag ...string) (string, error) {
 
 	// Результат
 	var result string
@@ -117,7 +153,7 @@ func GetText(responce *http.Response, defaultTag ...string) (string, error) {
 	}
 
 	if defaultTag[0] != "" {
-		tag = defaultTag[0]
+		tag = strings.ReplaceAll(defaultTag[0], " ", "")
 	}
 
 	// Считываем тело запроса

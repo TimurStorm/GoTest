@@ -2,7 +2,7 @@
 ### Useful commands:
 ```golang
 go run main.go                               - start programm
-go test -coverprofile cov.out ./urls ./words - coverage tests
+go test -coverprofile cov.out ./words        - coverage tests
 go tool cover -html cov.out                  - view coverage in a browser
 go tool cover -func cov.out                  - view coverage in a console
 ```
