@@ -32,7 +32,7 @@ func spliter(s string, splits string) []string {
 }
 
 // GetTopData записывает в массив интерфейс с топ 3 словами и их количеством на странице
-func GetTopData(url string, data *[]Result, wg sync.WaitGroup, defaultTag ...string) {
+func GetTopData(url string, data *[]Result, wg *sync.WaitGroup, defaultTag ...string) {
 	var tag string
 
 	if defaultTag[0] != "" {
@@ -42,6 +42,7 @@ func GetTopData(url string, data *[]Result, wg sync.WaitGroup, defaultTag ...str
 	fmt.Printf("REQUEST %v \n", url)
 	// Отправляем запрос
 	resp, respErr := http.Get(url)
+
 	if respErr != nil {
 		fmt.Println("Ошибка отправки запроса: ", respErr)
 	} else if resp.StatusCode == 200 {
@@ -51,10 +52,10 @@ func GetTopData(url string, data *[]Result, wg sync.WaitGroup, defaultTag ...str
 		} else {
 			// Получаем топ 3 упомянаемых слова с колиством упомянаний
 			words, count := getWordsCount(text)
-
 			// Сохраняем полученные данные
 			result := Result{url, words, count}
 			*data = append(*data, result)
+
 		}
 	}
 	wg.Done()
@@ -152,6 +153,7 @@ func getText(responce *http.Response, defaultTag ...string) (string, error) {
 		result += text
 	}
 
+	// Если был получен тег по умолчанию
 	if defaultTag[0] != "" {
 		tag = strings.ReplaceAll(defaultTag[0], " ", "")
 	}
@@ -161,6 +163,7 @@ func getText(responce *http.Response, defaultTag ...string) (string, error) {
 	if docErr != nil {
 		return "", docErr
 	}
+	// Получаем разметку тега body
 	bodyHTML, htmlErr := doc.Html()
 	// Ошибка конвертации html
 	if htmlErr != nil {
@@ -169,7 +172,7 @@ func getText(responce *http.Response, defaultTag ...string) (string, error) {
 	if strings.Contains(bodyHTML, "div") {
 		// Считываем тег
 		if tag == "" {
-			fmt.Println("Введите тег для получения конкретной информации (например: 'a') или 'body' для полной информации:")
+			fmt.Printf("Введите тег для получения конкретной информации с (например: 'a') или 'body' для полной информации:")
 			fmt.Scan(&tag)
 		}
 

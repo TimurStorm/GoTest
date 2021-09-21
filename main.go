@@ -48,11 +48,12 @@ func main() {
 		if len(row) == 2 {
 			tag = row[1]
 		}
-		go words.GetTopData(url, &data, wg, tag)
+		go words.GetTopData(url, &data, &wg, tag)
 	}
 
 	// Ждём выолнения всех горутин
 	wg.Wait()
+	fmt.Println("wait continue")
 	// Запись результатов в файл
 	encodeErr := result.PrettyWriteJSON(jsonFile, data)
 	if encodeErr != nil {

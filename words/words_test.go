@@ -41,7 +41,7 @@ func TestGetTopData(t *testing.T) {
 			if len(row) == 2 {
 				tag = row[1]
 			}
-			GetTopData(url, &data, wg, tag)
+			GetTopData(url, &data, &wg, tag)
 		}
 
 		for _, result := range data {
