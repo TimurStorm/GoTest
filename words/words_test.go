@@ -5,35 +5,19 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 )
 
-func isNil(result Result) bool {
-	for _, value := range result.Count {
-		if value == 0 {
-			return true
-		}
-	}
-	for _, word := range result.Words {
-		if word == "" {
-			return true
-		}
-	}
-	return false
-}
-
 func TestGetTopData(t *testing.T) {
-	var wg sync.WaitGroup
-
+	// Канал для передачи данных
+	urlResult := make(chan Result)
+	urlCount := 0
 	urlFile, urlErr := os.Open("test.txt")
 	if urlErr != nil {
 		fmt.Println("Ошибка чтения файла: ", urlErr)
 	} else {
 		scanner := bufio.NewScanner(urlFile)
-		data := []Result{}
 		for scanner.Scan() {
-			wg.Add(1)
 			var tag string
 			row := strings.Split(scanner.Text(), ",")
 			url := row[0]
@@ -41,13 +25,17 @@ func TestGetTopData(t *testing.T) {
 			if len(row) == 2 {
 				tag = row[1]
 			}
-			GetTopData(url, &data, &wg, tag)
+			go GetTopData(url, urlResult, tag)
+			urlCount++
 		}
-
-		for _, result := range data {
-			if isNil(result) {
-				t.Error("Nil element")
+		for ; urlCount != 0; urlCount-- {
+			// Считываем результат из канала
+			result := <-urlResult
+			// Если нет результатов
+			if result.Count == [3]int{0, 0, 0} {
+				t.Error("Error")
 			}
 		}
+		close(urlResult)
 	}
 }

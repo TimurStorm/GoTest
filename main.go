@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"main/result"
@@ -14,16 +13,18 @@ import (
 )
 
 func main() {
-	// Группа ожидания для горутин
-	var wg sync.WaitGroup
 	// Используем 1 ядро процессора
 	runtime.GOMAXPROCS(1)
 	// Для измерения времени
 	start := time.Now()
+	// Количество горутин
+	urlCount := 0
 	// Массив результирующих данных
 	var data []words.Result
+	// Канал для передачи данных
+	urlResult := make(chan words.Result)
 	// Открываем файл с урлами
-	urlFile, urlErr := os.Open("stres_test.txt")
+	urlFile, urlErr := os.Open("url.txt")
 	if urlErr != nil {
 		fmt.Println("Ошибка считывания файла с url:", urlErr)
 	}
@@ -40,7 +41,6 @@ func main() {
 	scanner := bufio.NewScanner(urlFile)
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
-		wg.Add(1)
 		var tag string
 		row := strings.Split(scanner.Text(), ",")
 		url := row[0]
@@ -48,12 +48,19 @@ func main() {
 		if len(row) == 2 {
 			tag = row[1]
 		}
-		go words.GetTopData(url, &data, &wg, tag)
+		go words.GetTopData(url, urlResult, tag)
+		urlCount++
 	}
-
-	// Ждём выолнения всех горутин
-	wg.Wait()
-	fmt.Println("wait continue")
+	fmt.Println("Всего горутин ", urlCount)
+	for ; urlCount != 0; urlCount-- {
+		// Считываем результат из канала
+		result := <-urlResult
+		// Если нет результатов
+		if result.Count == [3]int{0, 0, 0} {
+			data = append(data, result)
+		}
+	}
+	close(urlResult)
 	// Запись результатов в файл
 	encodeErr := result.PrettyWriteJSON(jsonFile, data)
 	if encodeErr != nil {

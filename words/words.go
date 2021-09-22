@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -32,8 +31,12 @@ func spliter(s string, splits string) []string {
 }
 
 // GetTopData записывает в массив интерфейс с топ 3 словами и их количеством на странице
-func GetTopData(url string, data *[]Result, wg *sync.WaitGroup, defaultTag ...string) {
+func GetTopData(url string, utlResult chan Result, defaultTag ...string) {
+	// Указанный пользователем в файле тег
 	var tag string
+	// Результат
+	var result Result
+	result.Url = url
 
 	if defaultTag[0] != "" {
 		tag = defaultTag[0]
@@ -52,13 +55,12 @@ func GetTopData(url string, data *[]Result, wg *sync.WaitGroup, defaultTag ...st
 		} else {
 			// Получаем топ 3 упомянаемых слова с колиством упомянаний
 			words, count := getWordsCount(text)
-			// Сохраняем полученные данные
-			result := Result{url, words, count}
-			*data = append(*data, result)
-
+			result.Count = count
+			result.Words = words
 		}
 	}
-	wg.Done()
+	// Передаём полученные данные в канал
+	utlResult <- result
 }
 
 // getWordsCount Возвращает топ 3 слов текста
