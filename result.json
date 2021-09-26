@@ -1,15 +1,11 @@
-[
-    {
-        "Url": "http://dgsdgsgseg.com/",
-        "Words": [
-            "",
-            "",
-            ""
-        ],
-        "Count": [
-            0,
-            0,
-            0
-        ]
-    }
-]
+{"Url":"https://fabulae.ru/prose_b.php?id=75081","Words":["собак","Миша","Кинг"],"Count":[27,18,18]}
+{"Url":"https://habr.com/ru/company/itsumma/blog/578460/","Words":["данных","Palantir","систем"],"Count":[17,17,17]}
+{"Url":"https://fabulae.ru/prose_b.php?id=117958","Words":["меня","потом","слов"],"Count":[18,10,10]}
+{"Url":"https://habr.com/ru/post/578414/","Words":["return","function","settings"],"Count":[20,20,15]}
+{"Url":"https://www.rfc-editor.org/rfc/rfc172.txt","Words":["file","data","transfer"],"Count":[81,54,44]}
+{"Url":"https://habr.com/ru/flows/develop/","Words":["голосов","можно","данных"],"Count":[23,19,18]}
+{"Url":"https://habr.com/ru/company/otus/blog/578502/","Words":["фреймворк","тест","автоматизации"],"Count":[39,37,26]}
+{"Url":"https://www.digitalocean.com/community/tutorials/how-to-use-variables-and-constants-in-go-ru","Words":["переменной","значение","программ"],"Count":[39,35,34]}
+{"Url":"https://habr.com/ru/company/pixonic/blog/578500/","Words":["задач","дизайн","этом"],"Count":[78,48,44]}
+{"Url":"https://habr.com/ru/post/578464/","Words":["задач","может","перерыв"],"Count":[17,13,13]}
+{"Url":"https://habr.com/ru/company/timeweb/blog/578398/","Words":["авто","Комментарии","было"],"Count":[27,14,8]}

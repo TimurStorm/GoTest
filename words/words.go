@@ -1,13 +1,18 @@
 package words
 
 import (
+	"bufio"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/sync/errgroup"
 	"jaytaylor.com/html2text"
 )
 
@@ -30,41 +35,8 @@ func spliter(s string, splits string) []string {
 	return strings.FieldsFunc(s, splitter)
 }
 
-// GetTopData записывает в массив интерфейс с топ 3 словами и их количеством на странице
-func GetTopData(url string, utlResult chan Result, defaultTag ...string) {
-	// Указанный пользователем в файле тег
-	var tag string
-	// Результат
-	var result Result
-	result.Url = url
-
-	if defaultTag[0] != "" {
-		tag = defaultTag[0]
-	}
-
-	fmt.Printf("REQUEST %v \n", url)
-	// Отправляем запрос
-	resp, respErr := http.Get(url)
-
-	if respErr != nil {
-		fmt.Println("Ошибка отправки запроса: ", respErr)
-	} else if resp.StatusCode == 200 {
-		text, textErr := getText(resp, tag)
-		if textErr != nil {
-			fmt.Println("Ошибка получения текста: ", textErr)
-		} else {
-			// Получаем топ 3 упомянаемых слова с колиством упомянаний
-			words, count := getWordsCount(text)
-			result.Count = count
-			result.Words = words
-		}
-	}
-	// Передаём полученные данные в канал
-	utlResult <- result
-}
-
-// getWordsCount Возвращает топ 3 слов текста
-func getWordsCount(text string) ([3]string, [3]int) {
+// GetTopWords Возвращает топ 3 слов текста по упоминаниям и их количество
+func GetTopWords(text string) ([3]string, [3]int, error) {
 	// Вспомогательная функция: проверка на принадлежность строки к массиву
 	containString := func(list []string, substing string) bool {
 		for _, value := range list {
@@ -134,30 +106,30 @@ func getWordsCount(text string) ([3]string, [3]int) {
 		maxCount--
 	}
 
-	return resWords, resCount
+	return resWords, resCount, nil
 }
 
-// getText возвращает текст запроса
-func getText(responce *http.Response, defaultTag ...string) (string, error) {
-
+// GetText возвращает текст запроса
+func GetText(responce *http.Response, params ...[]string) (string, error) {
 	// Результат
 	var result string
 
-	// Ошибка получения текста
-	var textErr, htmlErr error
+	// Ошибка извлечения тектса из тега
+	var divErr error
 
-	// Тег для поиска информации
-	var tag string
-
-	textFrom := func(html string) {
-		text, err := html2text.FromString(html, html2text.Options{OmitLinks: true})
-		textErr = err
-		result += text
+	// Html теги
+	var tags []string
+	if len(params[0]) > 0 {
+		tags = params[0]
+	} else {
+		tags = append(tags, "div")
 	}
 
-	// Если был получен тег по умолчанию
-	if defaultTag[0] != "" {
-		tag = strings.ReplaceAll(defaultTag[0], " ", "")
+	// Вспомогательная функция:
+	textFrom := func(html string) error {
+		text, err := html2text.FromString(html, html2text.Options{OmitLinks: true})
+		result += text
+		return err
 	}
 
 	// Считываем тело запроса
@@ -166,44 +138,132 @@ func getText(responce *http.Response, defaultTag ...string) (string, error) {
 		return "", docErr
 	}
 	// Получаем разметку тега body
-	bodyHTML, htmlErr := doc.Html()
+	bodyHTML, err := doc.Html()
 	// Ошибка конвертации html
-	if htmlErr != nil {
-		return "", htmlErr
+	if err != nil {
+		return "", err
 	}
 	if strings.Contains(bodyHTML, "div") {
-		// Считываем тег
-		if tag == "" {
-			fmt.Printf("Введите тег для получения конкретной информации с (например: 'a') или 'body' для полной информации:")
-			fmt.Scan(&tag)
-		}
-
 		// Для каждого тега в файле получаем его html-вёрстку, из которой получаем текст
-		doc.Find(tag).Each(func(index int, item *goquery.Selection) {
-			html, err := item.Html()
-			htmlErr = err
-			if tag == "div" {
-				if !(strings.Contains(html, "div")) {
-					textFrom(html)
+		for _, tag := range tags {
+			doc.Find(tag).Each(func(index int, item *goquery.Selection) {
+				html, err := item.Html()
+				if err != nil {
+					divErr = nil
 				}
-			} else {
-				textFrom(html)
-			}
-
-		})
+				if !(strings.Contains(html, "div")) {
+					err = textFrom(html)
+					if err != nil {
+						divErr = nil
+					}
+				}
+			})
+		}
 	} else {
 		textFrom(bodyHTML)
 	}
 
-	// Ошибка конвертации html
-	if htmlErr != nil {
-		return "", htmlErr
+	if divErr != nil {
+		return "", divErr
+	}
+	return result, nil
+}
+
+// GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их колиечеством на странице сайта
+func GetTop(url string, params ...[]string) (Result, error) {
+
+	fmt.Printf("REQUEST %v \n", url)
+
+	// Отправляем запрос
+	resp, err := http.Get(url)
+	if err != nil {
+		return Result{}, err
+	}
+	if resp.StatusCode != 200 {
+		return Result{}, errors.New("Bad responce status: " + resp.Status)
 	}
 
-	// Ошибка передачи текста
-	if textErr != nil {
-		return "", textErr
+	// Инициализируем теги
+	var tags []string
+	if len(params) > 0 {
+		tags = params[0]
 	}
+
+	// Получаем текст
+	text, err := GetText(resp, tags)
+	if err != nil {
+		return Result{}, err
+	}
+
+	// Получаем топ 3 слова
+	words, count, err := GetTopWords(text)
+	if err != nil {
+		return Result{}, err
+	}
+
+	result := Result{Url: url, Count: count, Words: words}
 
 	return result, nil
+}
+
+// FindTopForFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
+func FindTopForFile(urlFileName string, resultFileName string, params ...[]string) error {
+	// Открываем файл с урлами
+	urlFile, err := os.Open(urlFileName)
+	if err != nil {
+		return err
+	}
+	defer urlFile.Close()
+
+	// Открываем файл с результатами
+	resultFile, err := os.Create(resultFileName)
+	if err != nil {
+		return err
+	}
+
+	defer resultFile.Close()
+	defer urlFile.Close()
+
+	encoder := json.NewEncoder(resultFile)
+
+	// Инициализируем сканер
+	scanner := bufio.NewScanner(urlFile)
+
+	// Инициализируем теги
+	var tags []string
+	if len(params) > 0 {
+		tags = params[0]
+	}
+
+	var wg errgroup.Group
+	// Проходимся по всем урлам в файле, для каждого определяем топ 3
+	for scanner.Scan() {
+		url := scanner.Text()
+		err := scanner.Err()
+		if err != nil {
+			return err
+		}
+		if url != "" {
+			wg.Go(func() error {
+				// Получаем результат
+				result, err := GetTop(url, tags)
+				if err != nil {
+					return err
+				}
+
+				// Записываем результат
+				err = encoder.Encode(result)
+				if err != nil {
+					return err
+				}
+				return nil
+			})
+		}
+	}
+	err = wg.Wait()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
