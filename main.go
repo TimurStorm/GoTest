@@ -10,10 +10,10 @@ import (
 func main() {
 	// Используем 1 ядро процессора
 	runtime.GOMAXPROCS(1)
-
+	//
 	// Для измерения времени
 	start := time.Now()
-	err := words.FindTopForFile("url.txt", "result.json", []string{"div", "p"})
+	err := words.FindTopForFile("url.txt", "result.json", words.Options{Tags: []string{"p", "a"}})
 
 	if err != nil {
 		fmt.Println(err)

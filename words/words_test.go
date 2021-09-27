@@ -34,7 +34,7 @@ var simpleFiles = [][]string{
 
 func TestGetTop(t *testing.T) {
 	for _, top := range topWordsData {
-		result, err := GetTop(top.Url, []string{"div"})
+		result, err := GetTop(top.Url)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -47,7 +47,7 @@ func TestGetTop(t *testing.T) {
 
 func TestFindTopForFile(t *testing.T) {
 	for _, files := range simpleFiles {
-		err := FindTopForFile(files[0], files[1], []string{"div"})
+		err := FindTopForFile(files[0], files[1])
 		if err != nil {
 			fmt.Println(err)
 		}

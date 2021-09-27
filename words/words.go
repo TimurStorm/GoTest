@@ -35,6 +35,11 @@ func spliter(s string, splits string) []string {
 	return strings.FieldsFunc(s, splitter)
 }
 
+type Options struct {
+	Tags       []string
+	SiteRepeat bool
+}
+
 // GetTopWords Возвращает топ 3 слов текста по упоминаниям и их количество
 func GetTopWords(text string) ([3]string, [3]int, error) {
 	// Вспомогательная функция: проверка на принадлежность строки к массиву
@@ -170,8 +175,11 @@ func GetText(responce *http.Response, params ...[]string) (string, error) {
 }
 
 // GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их колиечеством на странице сайта
-func GetTop(url string, params ...[]string) (Result, error) {
-
+func GetTop(url string, o ...Options) (Result, error) {
+	var options Options
+	if len(o) > 0 {
+		options = o[0]
+	}
 	fmt.Printf("REQUEST %v \n", url)
 
 	// Отправляем запрос
@@ -179,14 +187,15 @@ func GetTop(url string, params ...[]string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+
 	if resp.StatusCode != 200 {
 		return Result{}, errors.New("Bad responce status: " + resp.Status)
 	}
 
 	// Инициализируем теги
 	var tags []string
-	if len(params) > 0 {
-		tags = params[0]
+	if len(options.Tags) > 0 {
+		tags = options.Tags
 	}
 
 	// Получаем текст
@@ -207,7 +216,12 @@ func GetTop(url string, params ...[]string) (Result, error) {
 }
 
 // FindTopForFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
-func FindTopForFile(urlFileName string, resultFileName string, params ...[]string) error {
+func FindTopForFile(urlFileName string, resultFileName string, o ...Options) error {
+	var options Options
+	if len(o) > 0 {
+		options = o[0]
+	}
+
 	// Открываем файл с урлами
 	urlFile, err := os.Open(urlFileName)
 	if err != nil {
@@ -229,12 +243,6 @@ func FindTopForFile(urlFileName string, resultFileName string, params ...[]strin
 	// Инициализируем сканер
 	scanner := bufio.NewScanner(urlFile)
 
-	// Инициализируем теги
-	var tags []string
-	if len(params) > 0 {
-		tags = params[0]
-	}
-
 	var wg errgroup.Group
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
@@ -246,7 +254,9 @@ func FindTopForFile(urlFileName string, resultFileName string, params ...[]strin
 		if url != "" {
 			wg.Go(func() error {
 				// Получаем результат
-				result, err := GetTop(url, tags)
+				var result Result
+				result, err = GetTop(url, options)
+
 				if err != nil {
 					return err
 				}
