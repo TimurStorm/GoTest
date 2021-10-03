@@ -3,13 +3,10 @@ package words
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/sync/errgroup"
@@ -22,51 +19,19 @@ type Result struct {
 	Count [3]int
 }
 
-func spliter(s string, splits string) []string {
-	m := make(map[rune]int)
-	for _, r := range splits {
-		m[r] = 1
-	}
-
-	splitter := func(r rune) bool {
-		return m[r] == 1
-	}
-
-	return strings.FieldsFunc(s, splitter)
-}
-
 type Options struct {
 	Tags       []string
 	SiteRepeat bool
 }
 
+type OptionsPlus struct {
+	Tags        []string
+	Client      http.Client
+	MaxTryCount int
+}
+
 // GetTopWords Возвращает топ 3 слов текста по упоминаниям и их количество
 func GetTopWords(text string) ([3]string, [3]int, error) {
-	// Вспомогательная функция: проверка на принадлежность строки к массиву
-	containString := func(list []string, substing string) bool {
-		for _, value := range list {
-			if value == substing {
-				return true
-			}
-		}
-		return false
-	}
-
-	// Вспомогательная функция: проверка на слово
-	isWord := func(s string) bool {
-		for _, r := range s {
-			if !unicode.IsLetter(r) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// Уникальные слова
-	var data []string
-
-	// Наибольшее количество упомянаний
-	var maxCount int = 0
 
 	// Итоговые топ 3 слова
 	var resWords [3]string
@@ -74,27 +39,8 @@ func GetTopWords(text string) ([3]string, [3]int, error) {
 	// Итоговое число упомянаний топ 3 слов
 	var resCount [3]int
 
-	// Для определения самых популярных
-	wordCount := make(map[int][]string)
-
-	// Получаем все слова из текста
-	allWords := spliter(text, " -.,?!()<>_")
-
-	// Определяем все уникальные слова
-	for _, word := range allWords {
-		if utf8.RuneCountInString(word) > 3 && isWord(word) && !containString(data, word) {
-			data = append(data, word)
-		}
-	}
-
-	// Классификация слов по популярности
-	for _, word := range data {
-		c := strings.Count(text, word)
-		wordCount[c] = append(wordCount[c], word)
-		if c > maxCount {
-			maxCount = c
-		}
-	}
+	// Определяем популярные слова и максимальное их значение
+	wordCount, maxCount := getPopularWords(text)
 
 	// Отбираем топ 3 слова
 	for nodeCount := 0; nodeCount < 3 && maxCount != 0; {
@@ -174,23 +120,19 @@ func GetText(responce *http.Response, params ...[]string) (string, error) {
 	return result, nil
 }
 
-// GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их колиечеством на странице сайта
-func GetTop(url string, o ...Options) (Result, error) {
-	var options Options
+// GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
+func GetTop(url string, o ...OptionsPlus) (Result, error) {
+	var options OptionsPlus
 	if len(o) > 0 {
 		options = o[0]
 	}
 	fmt.Printf("REQUEST %v \n", url)
-
 	// Отправляем запрос
-	resp, err := http.Get(url)
+	resp, err := sendRequest(url, &options.Client)
 	if err != nil {
 		return Result{}, err
 	}
-
-	if resp.StatusCode != 200 {
-		return Result{}, errors.New("Bad responce status: " + resp.Status)
-	}
+	defer resp.Body.Close()
 
 	// Инициализируем теги
 	var tags []string
@@ -222,6 +164,16 @@ func FindTopForFile(urlFileName string, resultFileName string, o ...Options) err
 		options = o[0]
 	}
 
+	client := http.Client{}
+	var repeatedDomains []string
+	if options.SiteRepeat {
+		repeated, err := getRepeated(urlFileName)
+		if err != nil {
+			return err
+		}
+		repeatedDomains = repeated
+	}
+
 	// Открываем файл с урлами
 	urlFile, err := os.Open(urlFileName)
 	if err != nil {
@@ -242,7 +194,6 @@ func FindTopForFile(urlFileName string, resultFileName string, o ...Options) err
 
 	// Инициализируем сканер
 	scanner := bufio.NewScanner(urlFile)
-
 	var wg errgroup.Group
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
@@ -252,22 +203,31 @@ func FindTopForFile(urlFileName string, resultFileName string, o ...Options) err
 			return err
 		}
 		if url != "" {
-			wg.Go(func() error {
-				// Получаем результат
-				var result Result
-				result, err = GetTop(url, options)
+			domain, err := getDomain(url)
+			if err != nil {
+				fmt.Println(err)
+			}
+			wg.Go(
+				func() error {
+					// Получаем результат
+					var result Result
+					if arrayContainString(repeatedDomains, domain) {
+						result, err = GetTop(url, OptionsPlus{Tags: options.Tags, Client: client})
+					} else {
+						result, err = GetTop(url, OptionsPlus{Tags: options.Tags})
+					}
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
 
-				if err != nil {
-					return err
-				}
-
-				// Записываем результат
-				err = encoder.Encode(result)
-				if err != nil {
-					return err
-				}
-				return nil
-			})
+					// Записываем результат
+					err = encoder.Encode(result)
+					if err != nil {
+						return err
+					}
+					return nil
+				})
 		}
 	}
 	err = wg.Wait()
