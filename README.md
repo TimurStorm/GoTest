@@ -5,7 +5,7 @@
 * `go run main.go`                                      - start programm
 
 #### Test:
-* `go test -coverprofile cov.out ./words ./reult`       - test coverage
+* `go test -coverprofile cov.out ./words `       - test coverage
 * `go tool cover -html cov.out`                         - view coverage in browser
 * `go tool cover -func cov.out`                         - view coverage in console
 

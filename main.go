@@ -13,11 +13,13 @@ func main() {
 
 	// Для измерения времени
 	start := time.Now()
-	err := words.FindTopForFile("url.txt", "result.json", words.Options{Tags: []string{"p", "a"}, SiteRepeat: true})
+	err := words.GetTopForFile("url.txt", "result.json", words.GetTopFFOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
 
 	if err != nil {
 		fmt.Println(err)
 	}
+	result, _ := words.GetTop("https://www.habr.com")
+	fmt.Println(result)
 
 	// Вывод затраченного времени
 	fmt.Printf("Time spend: %v", time.Since(start))

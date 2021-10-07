@@ -7,11 +7,16 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/sync/errgroup"
 	"jaytaylor.com/html2text"
 )
+
+var DomainsMutex = new(sync.Mutex)
+var Domains = make(map[string]int)
 
 type Result struct {
 	Url   string
@@ -19,15 +24,20 @@ type Result struct {
 	Count [3]int
 }
 
-type Options struct {
-	Tags       []string
-	SiteRepeat bool
+type GetTopFFOptions struct {
+	Tags         []string
+	HostReqLimit int
+	Client       http.Client
 }
 
-type OptionsPlus struct {
-	Tags        []string
-	Client      http.Client
-	MaxTryCount int
+type GetTopOptions struct {
+	Main    GetTopFFOptions
+	Domains *RepeatOptions
+}
+
+type RepeatOptions struct {
+	DomainsMutex *sync.Mutex
+	Domains      map[string]int
 }
 
 // GetTopWords Возвращает топ 3 слов текста по упоминаниям и их количество
@@ -121,23 +131,23 @@ func GetText(responce *http.Response, params ...[]string) (string, error) {
 }
 
 // GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
-func GetTop(url string, o ...OptionsPlus) (Result, error) {
-	var options OptionsPlus
+func GetTop(url string, o ...GetTopOptions) (Result, error) {
+	var options GetTopOptions
 	if len(o) > 0 {
 		options = o[0]
 	}
 	fmt.Printf("REQUEST %v \n", url)
+
 	// Отправляем запрос
-	resp, err := sendRequest(url, &options.Client)
+	resp, err := sendRequest(url, SendReqOptions{Client: &options.Main.Client, Domains: options.Domains, HostReqLimit: options.Main.HostReqLimit})
 	if err != nil {
 		return Result{}, err
 	}
-	defer resp.Body.Close()
 
 	// Инициализируем теги
 	var tags []string
-	if len(options.Tags) > 0 {
-		tags = options.Tags
+	if len(options.Main.Tags) > 0 {
+		tags = options.Main.Tags
 	}
 
 	// Получаем текст
@@ -157,21 +167,23 @@ func GetTop(url string, o ...OptionsPlus) (Result, error) {
 	return result, nil
 }
 
-// FindTopForFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
-func FindTopForFile(urlFileName string, resultFileName string, o ...Options) error {
-	var options Options
+// GetTopForFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
+func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopFFOptions) error {
+	var options GetTopFFOptions
 	if len(o) > 0 {
 		options = o[0]
 	}
 
-	client := http.Client{}
-	var repeatedDomains []string
-	if options.SiteRepeat {
-		repeated, err := getRepeated(urlFileName)
+	options.Client = http.Client{Timeout: time.Duration(5) * time.Second}
+	domains := RepeatOptions{Domains: make(map[string]int), DomainsMutex: new(sync.Mutex)}
+	if options.HostReqLimit != 0 {
+		repeated, err := getRepeatedHosts(urlFileName)
 		if err != nil {
 			return err
 		}
-		repeatedDomains = repeated
+		for _, domain := range repeated {
+			Domains[domain] = 0
+		}
 	}
 
 	// Открываем файл с урлами
@@ -203,20 +215,14 @@ func FindTopForFile(urlFileName string, resultFileName string, o ...Options) err
 			return err
 		}
 		if url != "" {
-			domain, err := getDomain(url)
-			if err != nil {
-				fmt.Println(err)
-			}
 			wg.Go(
 				func() error {
 					// Получаем результат
 					var result Result
-					if arrayContainString(repeatedDomains, domain) {
-						result, err = GetTop(url, OptionsPlus{Tags: options.Tags, Client: client})
-					} else {
-						result, err = GetTop(url, OptionsPlus{Tags: options.Tags})
-					}
+					var err error
+					result, err = GetTop(url, GetTopOptions{Main: options, Domains: &domains})
 					if err != nil {
+						err = fmt.Errorf("error: %v url: %v", err, url)
 						fmt.Println(err)
 						return err
 					}
@@ -224,6 +230,8 @@ func FindTopForFile(urlFileName string, resultFileName string, o ...Options) err
 					// Записываем результат
 					err = encoder.Encode(result)
 					if err != nil {
+						err = fmt.Errorf("error: %v url: %v", err, url)
+						fmt.Println(err)
 						return err
 					}
 					return nil

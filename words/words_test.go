@@ -8,50 +8,21 @@ import (
 	"testing"
 )
 
-var topWordsData = []Result{
-	{
-		"https://habr.com/ru/post/578464/",
-		[3]string{"Комментарии", "голосов", "дела"},
-		[3]int{11, 10, 5},
-	},
-	{
-		"https://testexample.com",
-		[3]string{"", "", ""},
-		[3]int{0, 0, 0},
-	},
-	{
-		"https://www.rfc-editor.org/rfc/rfc172.txt",
-		[3]string{"file", "data", "transfer"},
-		[3]int{81, 54, 44},
-	},
-}
-
 var simpleFiles = [][]string{
-	{"tes.txt", "result.json"},
-	{"test.txt", ""},
-	{"test.txt", "result.json"},
+	{"url_test.txt", "result_test.json", "10"},
+	{"url_test.txt", "result_test.json", "0"},
+	{"u_test.txt", "result_test.json", "0"},
+	{"url_test.txt", "", "0"},
 }
 
-func TestGetTop(t *testing.T) {
-	for _, top := range topWordsData {
-		result, err := GetTop(top.Url)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		if result.Words != top.Words || result.Count != top.Count {
-			t.Errorf("Error: words %v with count %v, found %v with %v ", top.Words, top.Count, result.Words, result.Count)
-		}
-	}
-}
-
-func TestFindTopForFile(t *testing.T) {
+func TestGetTopForFile(t *testing.T) {
 	for _, files := range simpleFiles {
-		err := FindTopForFile(files[0], files[1])
+
+		err := GetTopForFile(files[0], files[1], GetTopFFOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
 		if err != nil {
 			fmt.Println(err)
 		}
-		resultFile, err := os.Open("result.json")
+		resultFile, err := os.Open("result_test.json")
 		if err != nil {
 			t.Error("Can't open result file")
 		}
