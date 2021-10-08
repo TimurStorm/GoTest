@@ -12,7 +12,6 @@ import (
 type SendReqOptions struct {
 	Client       *http.Client
 	HostReqLimit int
-	Domains      *RepeatOptions
 }
 
 // getResponce отправляет запрос
@@ -23,21 +22,28 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 	}
 	var resp *http.Response
 
+	// Получаем хост
 	un, err := url.Parse(u)
 	if err != nil {
 		return nil, err
 	}
 	domain := un.Hostname()
-	DomainsMutex.Lock()
-	_, domainContain := Domains[domain] // race
-	DomainsMutex.Unlock()
+
+	// Проверяем наличие хоста в мапе повторяющихся
+	HostsMutex.Lock()
+	_, domainContain := Hosts[domain]
+	HostsMutex.Unlock()
+
+	// Если хост в мапе
 	if domainContain {
 
+		// Создаем запрос
 		request, err := http.NewRequest("GET", u, nil)
 		if err != nil {
 			return nil, err
 		}
 
+		// Устанавливаем заголовки
 		request.Header = http.Header{
 			"Authority":                 []string{domain},
 			"Pragma":                    []string{"no-cache"},
@@ -53,28 +59,37 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 			"Sec-fetch-user":            []string{"?1"},
 			"Sec-fetch-dest":            []string{"document"},
 		}
-		DomainsMutex.Lock()
-		domains := options.Domains.Domains[domain] // race
-		DomainsMutex.Unlock()
-		if domains > options.HostReqLimit {
+
+		// Получаем количество подключений к данному хосту
+		HostsMutex.Lock()
+		hostCount := Hosts[domain]
+		HostsMutex.Unlock()
+
+		// Если количесвто подключений больше или равно лимиту
+		if hostCount >= options.HostReqLimit {
 			fmt.Println("Wait")
-			for domains >= options.HostReqLimit {
+
+			// Ожидание пока не освободится место новому запросу
+			for hostCount >= options.HostReqLimit {
 				time.Sleep(100 * time.Millisecond)
-				DomainsMutex.Lock()
-				domains = options.Domains.Domains[domain]
-				DomainsMutex.Unlock()
+				HostsMutex.Lock()
+				hostCount = Hosts[domain]
+				HostsMutex.Unlock()
 			}
 		}
 
-		DomainsMutex.Lock()
-		options.Domains.Domains[domain] += 1 // race
-		DomainsMutex.Unlock()
+		// + 1 запрос
+		HostsMutex.Lock()
+		Hosts[domain] += 1
+		HostsMutex.Unlock()
 
+		// Отправка запроса
 		resp, err := options.Client.Do(request)
 
-		DomainsMutex.Lock()
-		options.Domains.Domains[domain] -= 1
-		DomainsMutex.Unlock()
+		// - 1 запрос
+		HostsMutex.Lock()
+		Hosts[domain] -= 1
+		HostsMutex.Unlock()
 
 		if err != nil {
 			return resp, err
@@ -96,15 +111,23 @@ func sendRequest(url string, o ...SendReqOptions) (*http.Response, error) {
 		options = o[0]
 	}
 
+	// Получаем ответ
 	resp, err := getResponce(url, options)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode == 503 || resp.StatusCode == 429 {
 
+	// В случае если было отправлено большое количество запросов в ближайшее время
+	if resp.StatusCode == 503 || resp.StatusCode == 429 {
 		fmt.Printf("'%v' was received. Attempt to resend the request %v \n", resp.Status, url)
+
+		// Получаем timeout
 		keepAlive := resp.Header.Values("Keep-Alive")
+
+		// Timeout
 		var count int
+
+		// Если был найден такой заголовок в запросе
 		if len(keepAlive) > 0 {
 			timeout := strings.ReplaceAll(keepAlive[0], "timeout=", "")
 			count, err = strconv.Atoi(timeout)
@@ -112,22 +135,24 @@ func sendRequest(url string, o ...SendReqOptions) (*http.Response, error) {
 				fmt.Println(err)
 			}
 		} else {
-			// for name, values := range resp.Header {
-			// 	for _, value := range values {
-			// 		fmt.Println(name, value)
-			// 	}
-			// }
+			// Timeout по умолчанию
 			count = 15
 		}
 		fmt.Printf("Timeout is %v seconds\n", count)
+
+		// Счётчик попыток
 		num := 1
+
+		// Пытаемся получить хороший ответ от сервера
 		for resp.StatusCode != 200 {
 			time.Sleep(time.Duration(count) * time.Second)
 			resp, err = getResponce(url, options)
 			if err != nil {
 				fmt.Println(err)
 			}
-			if resp.StatusCode == 404 {
+
+			// Если была не найдена старница, невалиден запрос, запрещён доступ к ресурсу
+			if resp.StatusCode == 404 || resp.StatusCode == 400 || resp.StatusCode == 403 {
 				break
 			}
 			fmt.Printf("Try %v for %v status %v \n", num, url, resp.Status)

@@ -21,7 +21,7 @@ func getRepeatedHosts(urlFileName string) ([]string, error) {
 	}
 	defer urlFile.Close()
 
-	// Считываем урлы и считаем количесвто повторений их хостов
+	// Считываем урлы и считаем количество повторений хостов
 	scanner := bufio.NewScanner(urlFile)
 	for scanner.Scan() {
 		u := scanner.Text()
@@ -51,6 +51,8 @@ func getRepeatedHosts(urlFileName string) ([]string, error) {
 func getUnique(allWords []string) []string {
 	// Уникальные слова
 	var result []string
+
+	// Отбираем все слова с длинной больше 3
 	for _, word := range allWords {
 		if utf8.RuneCountInString(word) > 3 && isWord(word) && !arrayContainString(result, word) {
 			result = append(result, word)

@@ -18,7 +18,7 @@ var simpleFiles = [][]string{
 func TestGetTopForFile(t *testing.T) {
 	for _, files := range simpleFiles {
 
-		err := GetTopForFile(files[0], files[1], GetTopFFOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
+		err := GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
 		if err != nil {
 			fmt.Println(err)
 		}

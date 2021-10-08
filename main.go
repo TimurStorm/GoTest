@@ -13,7 +13,7 @@ func main() {
 
 	// Для измерения времени
 	start := time.Now()
-	err := words.GetTopForFile("url.txt", "result.json", words.GetTopFFOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
+	err := words.GetTopForFile("url.txt", "result.json", words.GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
 
 	if err != nil {
 		fmt.Println(err)

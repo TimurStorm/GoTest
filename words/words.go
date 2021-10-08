@@ -15,8 +15,8 @@ import (
 	"jaytaylor.com/html2text"
 )
 
-var DomainsMutex = new(sync.Mutex)
-var Domains = make(map[string]int)
+var HostsMutex = new(sync.Mutex)
+var Hosts = make(map[string]int)
 
 type Result struct {
 	Url   string
@@ -24,20 +24,10 @@ type Result struct {
 	Count [3]int
 }
 
-type GetTopFFOptions struct {
+type GetTopOptions struct {
 	Tags         []string
 	HostReqLimit int
 	Client       http.Client
-}
-
-type GetTopOptions struct {
-	Main    GetTopFFOptions
-	Domains *RepeatOptions
-}
-
-type RepeatOptions struct {
-	DomainsMutex *sync.Mutex
-	Domains      map[string]int
 }
 
 // GetTopWords Возвращает топ 3 слов текста по упоминаниям и их количество
@@ -139,15 +129,15 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 	fmt.Printf("REQUEST %v \n", url)
 
 	// Отправляем запрос
-	resp, err := sendRequest(url, SendReqOptions{Client: &options.Main.Client, Domains: options.Domains, HostReqLimit: options.Main.HostReqLimit})
+	resp, err := sendRequest(url, SendReqOptions{Client: &options.Client, HostReqLimit: options.HostReqLimit})
 	if err != nil {
 		return Result{}, err
 	}
 
 	// Инициализируем теги
 	var tags []string
-	if len(options.Main.Tags) > 0 {
-		tags = options.Main.Tags
+	if len(options.Tags) > 0 {
+		tags = options.Tags
 	}
 
 	// Получаем текст
@@ -168,21 +158,22 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 }
 
 // GetTopForFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
-func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopFFOptions) error {
-	var options GetTopFFOptions
+func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopOptions) error {
+	var options GetTopOptions
 	if len(o) > 0 {
 		options = o[0]
 	}
-
+	// Устанавливаем клиент
 	options.Client = http.Client{Timeout: time.Duration(5) * time.Second}
-	domains := RepeatOptions{Domains: make(map[string]int), DomainsMutex: new(sync.Mutex)}
+
+	// Если задан лимит запросов на один хост
 	if options.HostReqLimit != 0 {
 		repeated, err := getRepeatedHosts(urlFileName)
 		if err != nil {
 			return err
 		}
-		for _, domain := range repeated {
-			Domains[domain] = 0
+		for _, host := range repeated {
+			Hosts[host] = 0
 		}
 	}
 
@@ -206,7 +197,10 @@ func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopFFOptio
 
 	// Инициализируем сканер
 	scanner := bufio.NewScanner(urlFile)
+
+	// Инициализируем errgroup
 	var wg errgroup.Group
+
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
 		url := scanner.Text()
@@ -220,7 +214,7 @@ func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopFFOptio
 					// Получаем результат
 					var result Result
 					var err error
-					result, err = GetTop(url, GetTopOptions{Main: options, Domains: &domains})
+					result, err = GetTop(url, options)
 					if err != nil {
 						err = fmt.Errorf("error: %v url: %v", err, url)
 						fmt.Println(err)
