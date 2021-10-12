@@ -5,23 +5,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
+	"time"
 )
 
 var simpleFiles = [][]string{
 	{"url_test.txt", "result_test.json", "10"},
-	{"url_test.txt", "result_test.json", "0"},
-	{"u_test.txt", "result_test.json", "0"},
-	{"url_test.txt", "", "0"},
+	{"url_test.txt", "result_test.json"},
 }
 
 func TestGetTopForFile(t *testing.T) {
-	for _, files := range simpleFiles {
+	for index, files := range simpleFiles {
+		if len(files) > 2 {
+			count, err := strconv.Atoi(files[2])
+			if err != nil {
+				fmt.Println(err)
+			}
 
-		err := GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
-		if err != nil {
-			fmt.Println(err)
+			err = GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: count})
+			if err != nil {
+				fmt.Println(err)
+			}
+		} else {
+			err := GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}})
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
+
 		resultFile, err := os.Open("result_test.json")
 		if err != nil {
 			t.Error("Can't open result file")
@@ -47,6 +59,9 @@ func TestGetTopForFile(t *testing.T) {
 				t.Error("Untrust result")
 			}
 		}
+
+		fmt.Println(index, "ОКОНЧЕН")
+		time.Sleep(time.Second)
 	}
 
 }

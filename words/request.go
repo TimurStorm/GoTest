@@ -35,7 +35,7 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 	HostsMutex.Unlock()
 
 	// Если хост в мапе
-	if domainContain {
+	if domainContain && options.HostReqLimit != 0 {
 
 		// Создаем запрос
 		request, err := http.NewRequest("GET", u, nil)
@@ -96,6 +96,7 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 		}
 		return resp, nil
 	}
+	fmt.Println(Hosts)
 	resp, err = http.Get(u)
 	if err != nil {
 		return resp, err
@@ -105,7 +106,7 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 
 // sendRequest обрабатывает запрос
 func sendRequest(url string, o ...SendReqOptions) (*http.Response, error) {
-
+	defer fmt.Println(url, "выполнился")
 	var options SendReqOptions
 	if len(o) > 0 {
 		options = o[0]
