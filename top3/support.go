@@ -1,4 +1,4 @@
-package words
+package top3
 
 import (
 	"strings"
@@ -37,4 +37,15 @@ func arrayContainString(list []string, substing string) bool {
 		}
 	}
 	return false
+}
+
+// upCount возвращает количество букв в строке с up case
+func upCount(s string) int {
+	var count = 0
+	for _, r := range s {
+		if !unicode.IsUpper(r) {
+			count++
+		}
+	}
+	return count
 }

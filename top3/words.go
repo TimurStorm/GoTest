@@ -1,4 +1,4 @@
-package words
+package top3
 
 import (
 	"bufio"
@@ -61,20 +61,12 @@ func GetTopWords(text string) ([3]string, [3]int, error) {
 }
 
 // GetText возвращает текст запроса
-func GetText(responce *http.Response, params ...[]string) (string, error) {
+func GetText(responce *http.Response, tags ...[]string) (string, error) {
 	// Результат
 	var result string
 
 	// Ошибка извлечения тектса из тега
 	var divErr error
-
-	// Html теги
-	var tags []string
-	if len(params[0]) > 0 {
-		tags = params[0]
-	} else {
-		tags = append(tags, "div")
-	}
 
 	// Вспомогательная функция:
 	textFrom := func(html string) error {
@@ -84,19 +76,27 @@ func GetText(responce *http.Response, params ...[]string) (string, error) {
 	}
 
 	// Считываем тело запроса
-	doc, docErr := goquery.NewDocumentFromReader(responce.Body)
-	if docErr != nil {
-		return "", docErr
-	}
-	// Получаем разметку тега body
-	bodyHTML, err := doc.Html()
-	// Ошибка конвертации html
+	doc, err := goquery.NewDocumentFromReader(responce.Body)
 	if err != nil {
 		return "", err
 	}
+
+	// Получаем разметку тега body
+	bodyHTML, err := doc.Html()
+	if err != nil {
+		return "", err
+	}
+
 	if strings.Contains(bodyHTML, "div") {
+		// Теги
+		var t []string
+		if len(tags[0]) > 0 {
+			t = tags[0]
+		} else {
+			t = append(t, "div")
+		}
 		// Для каждого тега в файле получаем его html-вёрстку, из которой получаем текст
-		for _, tag := range tags {
+		for _, tag := range t {
 			doc.Find(tag).Each(func(index int, item *goquery.Selection) {
 				html, err := item.Html()
 				if err != nil {
@@ -117,6 +117,7 @@ func GetText(responce *http.Response, params ...[]string) (string, error) {
 	if divErr != nil {
 		return "", divErr
 	}
+
 	return result, nil
 }
 
@@ -134,14 +135,8 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 		return Result{}, err
 	}
 
-	// Инициализируем теги
-	var tags []string
-	if len(options.Tags) > 0 {
-		tags = options.Tags
-	}
-
 	// Получаем текст
-	text, err := GetText(resp, tags)
+	text, err := GetText(resp, options.Tags)
 	if err != nil {
 		return Result{}, err
 	}

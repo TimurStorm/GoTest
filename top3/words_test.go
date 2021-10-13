@@ -1,4 +1,4 @@
-package words
+package top3
 
 import (
 	"bufio"
@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	"time"
 )
 
 var simpleFiles = [][]string{
@@ -16,11 +15,11 @@ var simpleFiles = [][]string{
 }
 
 func TestGetTopForFile(t *testing.T) {
-	for index, files := range simpleFiles {
+	for _, files := range simpleFiles {
 		if len(files) > 2 {
 			count, err := strconv.Atoi(files[2])
 			if err != nil {
-				fmt.Println(err)
+				t.Error("Can't convert limit to int")
 			}
 
 			err = GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: count})
@@ -59,9 +58,39 @@ func TestGetTopForFile(t *testing.T) {
 				t.Error("Untrust result")
 			}
 		}
-
-		fmt.Println(index, "ОКОНЧЕН")
-		time.Sleep(time.Second)
 	}
+}
 
+type TopWords struct {
+	text  string
+	words [3]string
+	count [3]int
+}
+
+var simpleTexts = []TopWords{
+	{
+		text:  "Задача пример задачи задач примера результат",
+		words: [3]string{"задач", "пример", "результат"},
+		count: [3]int{3, 2, 1},
+	},
+	{
+		text:  "Была получена грамота, а нужно было много грамот. Если Грамот не одумается, то полученая ситуация принесёт нам много проблем",
+		words: [3]string{"Грамот", "получена", "много"},
+		count: [3]int{3, 2, 2},
+	},
+}
+
+func TestGetTopWords(t *testing.T) {
+	for _, top := range simpleTexts {
+		words, count, err := GetTopWords(top.text)
+		if err != nil {
+			t.Error("Error GetTopWords")
+		}
+		if words != top.words {
+			t.Error("Untrust words: ", words)
+		}
+		if count != top.count {
+			t.Error("Untrust count: ", count)
+		}
+	}
 }

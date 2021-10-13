@@ -1,4 +1,4 @@
-package words
+package top3
 
 import (
 	"bufio"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/fatih/camelcase"
 )
 
 // getRepeatedHosts возвращает все хосты из файла urlFileName с упоминаем более 1
@@ -54,6 +56,12 @@ func getUnique(allWords []string) []string {
 
 	// Отбираем все слова с длинной больше 3
 	for _, word := range allWords {
+		var up = upCount(word)
+		if up > 2 && up != utf8.RuneCountInString(word) {
+			allWords = append(allWords, camelcase.Split(word)...)
+			continue
+		}
+		word = strings.ToLower(word)
 		if utf8.RuneCountInString(word) > 3 && isWord(word) && !arrayContainString(result, word) {
 			result = append(result, word)
 		}
@@ -78,6 +86,7 @@ func getPopularWords(text string) (map[int][]string, int) {
 
 	// Классификация слов по популярности
 	for _, word := range uniqueWords {
+
 		c := strings.Count(text, word)
 		result[c] = append(result[c], word)
 		if c > maxCount {

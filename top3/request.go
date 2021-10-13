@@ -1,4 +1,4 @@
-package words
+package top3
 
 import (
 	"fmt"
@@ -15,19 +15,12 @@ type SendReqOptions struct {
 }
 
 // getResponce отправляет запрос
-func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
+func getResponce(u string, domain string, o ...SendReqOptions) (*http.Response, error) {
 	var options SendReqOptions
 	if len(o) > 0 {
 		options = o[0]
 	}
 	var resp *http.Response
-
-	// Получаем хост
-	un, err := url.Parse(u)
-	if err != nil {
-		return nil, err
-	}
-	domain := un.Hostname()
 
 	// Проверяем наличие хоста в мапе повторяющихся
 	HostsMutex.Lock()
@@ -43,39 +36,34 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 			return nil, err
 		}
 
-		// Устанавливаем заголовки
-		request.Header = http.Header{
-			"Authority":                 []string{domain},
-			"Pragma":                    []string{"no-cache"},
-			"Cache-control":             []string{"no-cache"},
-			"Sec-ch-ua":                 []string{`"Google Chrome";v="89", "Chromium";v="89", ";Not A Brand";v="99"`},
-			"Sec-ch-ua-mobile":          []string{"?0"},
-			"Upgrade-insecure-requests": []string{"1"},
-			"User-agent":                []string{"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36"},
-			"Accept":                    []string{"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"},
-			"Dnt":                       []string{"1"},
-			"Sec-fetch-site":            []string{"none"},
-			"Sec-fetch-mode":            []string{"navigate"},
-			"Sec-fetch-user":            []string{"?1"},
-			"Sec-fetch-dest":            []string{"document"},
-		}
+		// // Устанавливаем заголовки
+		// request.Header = http.Header{
+		// 	"Authority":                 []string{domain},
+		// 	"Pragma":                    []string{"no-cache"},
+		// 	"Cache-control":             []string{"no-cache"},
+		// 	"Sec-ch-ua":                 []string{`"Google Chrome";v="89", "Chromium";v="89", ";Not A Brand";v="99"`},
+		// 	"Sec-ch-ua-mobile":          []string{"?0"},
+		// 	"Upgrade-insecure-requests": []string{"1"},
+		// 	"User-agent":                []string{"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36"},
+		// 	"Accept":                    []string{"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"},
+		// 	"Dnt":                       []string{"1"},
+		// 	"Sec-fetch-site":            []string{"none"},
+		// 	"Sec-fetch-mode":            []string{"navigate"},
+		// 	"Sec-fetch-user":            []string{"?1"},
+		// 	"Sec-fetch-dest":            []string{"document"},
+		// }
 
 		// Получаем количество подключений к данному хосту
 		HostsMutex.Lock()
 		hostCount := Hosts[domain]
 		HostsMutex.Unlock()
 
-		// Если количесвто подключений больше или равно лимиту
-		if hostCount >= options.HostReqLimit {
-			fmt.Println("Wait")
-
-			// Ожидание пока не освободится место новому запросу
-			for hostCount >= options.HostReqLimit {
-				time.Sleep(100 * time.Millisecond)
-				HostsMutex.Lock()
-				hostCount = Hosts[domain]
-				HostsMutex.Unlock()
-			}
+		// Ожидание пока не освободится место новому запросу
+		for hostCount >= options.HostReqLimit {
+			time.Sleep(100 * time.Millisecond)
+			HostsMutex.Lock()
+			hostCount = Hosts[domain]
+			HostsMutex.Unlock()
 		}
 
 		// + 1 запрос
@@ -96,8 +84,8 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 		}
 		return resp, nil
 	}
-	fmt.Println(Hosts)
-	resp, err = http.Get(u)
+	// Стандартный метод отправки
+	resp, err := http.Get(u)
 	if err != nil {
 		return resp, err
 	}
@@ -105,22 +93,28 @@ func getResponce(u string, o ...SendReqOptions) (*http.Response, error) {
 }
 
 // sendRequest обрабатывает запрос
-func sendRequest(url string, o ...SendReqOptions) (*http.Response, error) {
-	defer fmt.Println(url, "выполнился")
+func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 	var options SendReqOptions
 	if len(o) > 0 {
 		options = o[0]
 	}
 
+	// Получаем хост
+	un, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	domain := un.Hostname()
+
 	// Получаем ответ
-	resp, err := getResponce(url, options)
+	resp, err := getResponce(u, domain, options)
 	if err != nil {
 		return nil, err
 	}
 
 	// В случае если было отправлено большое количество запросов в ближайшее время
 	if resp.StatusCode == 503 || resp.StatusCode == 429 {
-		fmt.Printf("'%v' was received. Attempt to resend the request %v \n", resp.Status, url)
+		fmt.Printf("'%v' was received. Attempt to resend the request %v \n", resp.Status, u)
 
 		// Получаем timeout
 		keepAlive := resp.Header.Values("Keep-Alive")
@@ -147,7 +141,7 @@ func sendRequest(url string, o ...SendReqOptions) (*http.Response, error) {
 		// Пытаемся получить хороший ответ от сервера
 		for resp.StatusCode != 200 {
 			time.Sleep(time.Duration(count) * time.Second)
-			resp, err = getResponce(url, options)
+			resp, err = getResponce(u, domain, options)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -156,7 +150,7 @@ func sendRequest(url string, o ...SendReqOptions) (*http.Response, error) {
 			if resp.StatusCode == 404 || resp.StatusCode == 400 || resp.StatusCode == 403 {
 				break
 			}
-			fmt.Printf("Try %v for %v status %v \n", num, url, resp.Status)
+			fmt.Printf("Try %v for %v status %v \n", num, u, resp.Status)
 			num++
 		}
 	}

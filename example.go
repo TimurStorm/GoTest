@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"main/words"
 	"runtime"
 	"time"
+
+	"main/top3"
 )
 
 func main() {
@@ -13,12 +14,15 @@ func main() {
 
 	// Для измерения времени
 	start := time.Now()
-	err := words.GetTopForFile("url.txt", "result.json", words.GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
+	err := top3.GetTopForFile("url.txt", "result.json", top3.GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
+	if err != nil {
+		fmt.Println(err)
+	}
+	result, err := top3.GetTop("https://habr.com/ru/post/578414/")
 
 	if err != nil {
 		fmt.Println(err)
 	}
-	result, _ := words.GetTop("https://www.habr.com")
 	fmt.Println(result)
 
 	// Вывод затраченного времени
