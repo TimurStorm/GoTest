@@ -49,7 +49,7 @@ func getRepeatedHosts(urlFileName string) ([]string, error) {
 	return result, nil
 }
 
-// getUnique воздвращает все уникальны слова массива строк
+// ПetUnique воздвращает все уникальны слова массива строк
 func getUnique(allWords []string) []string {
 	// Уникальные слова
 	var result []string
@@ -57,7 +57,7 @@ func getUnique(allWords []string) []string {
 	// Отбираем все слова с длинной больше 3
 	for _, word := range allWords {
 		var up = upCount(word)
-		if up > 2 && up != utf8.RuneCountInString(word) {
+		if up > 1 && up != utf8.RuneCountInString(word) {
 			allWords = append(allWords, camelcase.Split(word)...)
 			continue
 		}
@@ -83,6 +83,9 @@ func getPopularWords(text string) (map[int][]string, int) {
 
 	// Получаем уникальные слова
 	uniqueWords := getUnique(allWords)
+
+	//
+	text = strings.ToLower(text)
 
 	// Классификация слов по популярности
 	for _, word := range uniqueWords {

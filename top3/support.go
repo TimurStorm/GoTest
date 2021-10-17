@@ -43,7 +43,7 @@ func arrayContainString(list []string, substing string) bool {
 func upCount(s string) int {
 	var count = 0
 	for _, r := range s {
-		if !unicode.IsUpper(r) {
+		if unicode.IsUpper(r) {
 			count++
 		}
 	}

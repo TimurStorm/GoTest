@@ -27,31 +27,8 @@ func getResponce(u string, domain string, o ...SendReqOptions) (*http.Response, 
 	_, domainContain := Hosts[domain]
 	HostsMutex.Unlock()
 
-	// Если хост в мапе
+	// Если хост в мапе повторяющихся
 	if domainContain && options.HostReqLimit != 0 {
-
-		// Создаем запрос
-		request, err := http.NewRequest("GET", u, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		// // Устанавливаем заголовки
-		// request.Header = http.Header{
-		// 	"Authority":                 []string{domain},
-		// 	"Pragma":                    []string{"no-cache"},
-		// 	"Cache-control":             []string{"no-cache"},
-		// 	"Sec-ch-ua":                 []string{`"Google Chrome";v="89", "Chromium";v="89", ";Not A Brand";v="99"`},
-		// 	"Sec-ch-ua-mobile":          []string{"?0"},
-		// 	"Upgrade-insecure-requests": []string{"1"},
-		// 	"User-agent":                []string{"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36"},
-		// 	"Accept":                    []string{"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"},
-		// 	"Dnt":                       []string{"1"},
-		// 	"Sec-fetch-site":            []string{"none"},
-		// 	"Sec-fetch-mode":            []string{"navigate"},
-		// 	"Sec-fetch-user":            []string{"?1"},
-		// 	"Sec-fetch-dest":            []string{"document"},
-		// }
 
 		// Получаем количество подключений к данному хосту
 		HostsMutex.Lock()
@@ -72,7 +49,7 @@ func getResponce(u string, domain string, o ...SendReqOptions) (*http.Response, 
 		HostsMutex.Unlock()
 
 		// Отправка запроса
-		resp, err := options.Client.Do(request)
+		resp, err := http.Get(u)
 
 		// - 1 запрос
 		HostsMutex.Lock()
@@ -104,10 +81,11 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	domain := un.Hostname()
+	// Хост сайта
+	host := un.Hostname()
 
 	// Получаем ответ
-	resp, err := getResponce(u, domain, options)
+	resp, err := getResponce(u, host, options)
 	if err != nil {
 		return nil, err
 	}
@@ -118,20 +96,30 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 
 		// Получаем timeout
 		keepAlive := resp.Header.Values("Keep-Alive")
-
+		retryAfter := resp.Header.Values("Retry-After")
 		// Timeout
 		var count int
 
-		// Если был найден такой заголовок в запросе
 		if len(keepAlive) > 0 {
+			// Если был найден Keep-Alive в заголовках ответа
+
 			timeout := strings.ReplaceAll(keepAlive[0], "timeout=", "")
 			count, err = strconv.Atoi(timeout)
 			if err != nil {
 				fmt.Println(err)
 			}
+
+		} else if len(retryAfter) > 0 {
+			// Если был найден Retry-After в заголовках ответа
+
+			count, err = strconv.Atoi(retryAfter[0])
+			if err != nil {
+				fmt.Println(err)
+			}
 		} else {
-			// Timeout по умолчанию
-			count = 15
+			// По умолчанию
+
+			count = 60
 		}
 		fmt.Printf("Timeout is %v seconds\n", count)
 
@@ -141,7 +129,7 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 		// Пытаемся получить хороший ответ от сервера
 		for resp.StatusCode != 200 {
 			time.Sleep(time.Duration(count) * time.Second)
-			resp, err = getResponce(u, domain, options)
+			resp, err = getResponce(u, host, options)
 			if err != nil {
 				fmt.Println(err)
 			}

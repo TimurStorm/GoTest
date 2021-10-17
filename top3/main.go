@@ -61,9 +61,14 @@ func GetTopWords(text string) ([3]string, [3]int, error) {
 }
 
 // GetText возвращает текст запроса
-func GetText(responce *http.Response, tags ...[]string) (string, error) {
+func GetText(responce *http.Response, tags ...string) (string, error) {
 	// Результат
 	var result string
+	// Теги
+	var t []string
+	if len(tags) > 0 {
+		t = tags
+	}
 
 	// Ошибка извлечения тектса из тега
 	var divErr error
@@ -86,15 +91,7 @@ func GetText(responce *http.Response, tags ...[]string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	if strings.Contains(bodyHTML, "div") {
-		// Теги
-		var t []string
-		if len(tags[0]) > 0 {
-			t = tags[0]
-		} else {
-			t = append(t, "div")
-		}
+	if strings.Contains(bodyHTML, "div") && len(t) > 0 {
 		// Для каждого тега в файле получаем его html-вёрстку, из которой получаем текст
 		for _, tag := range t {
 			doc.Find(tag).Each(func(index int, item *goquery.Selection) {
@@ -102,7 +99,7 @@ func GetText(responce *http.Response, tags ...[]string) (string, error) {
 				if err != nil {
 					divErr = nil
 				}
-				if !(strings.Contains(html, "div")) {
+				if !(strings.Contains(html, "div")) && !(strings.Contains(html, "script")) {
 					err = textFrom(html)
 					if err != nil {
 						divErr = nil
@@ -110,12 +107,11 @@ func GetText(responce *http.Response, tags ...[]string) (string, error) {
 				}
 			})
 		}
+		if divErr != nil {
+			return "", divErr
+		}
 	} else {
 		textFrom(bodyHTML)
-	}
-
-	if divErr != nil {
-		return "", divErr
 	}
 
 	return result, nil
@@ -136,7 +132,7 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 	}
 
 	// Получаем текст
-	text, err := GetText(resp, options.Tags)
+	text, err := GetText(resp, options.Tags...)
 	if err != nil {
 		return Result{}, err
 	}
@@ -187,7 +183,7 @@ func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopOptions
 
 	defer resultFile.Close()
 	defer urlFile.Close()
-
+	// Инициализируем енкодер
 	encoder := json.NewEncoder(resultFile)
 
 	// Инициализируем сканер
@@ -199,10 +195,13 @@ func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopOptions
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
 		url := scanner.Text()
+
+		// Если была обнаружена ошибка при считывании
 		err := scanner.Err()
 		if err != nil {
 			return err
 		}
+
 		if url != "" {
 			wg.Go(
 				func() error {
