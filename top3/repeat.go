@@ -69,8 +69,8 @@ func getUnique(allWords []string) []string {
 	return result
 }
 
-// getPopularWords возращает классификацию слов по популярности в виде map и наибольшее количество поторений
-func getPopularWords(text string) (map[int][]string, int) {
+// getRating возращает классификацию слов по популярности в виде map и наибольшее количество поторений
+func getRating(text string) (map[int][]string, int) {
 
 	// Результат
 	result := make(map[int][]string)

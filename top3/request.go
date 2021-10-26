@@ -14,8 +14,8 @@ type SendReqOptions struct {
 	HostReqLimit int
 }
 
-// getResponce отправляет запрос
-func getResponce(u string, domain string, o ...SendReqOptions) (*http.Response, error) {
+// sendRequest отправляет запрос
+func sendRequest(u string, domain string, o ...SendReqOptions) (*http.Response, error) {
 	var options SendReqOptions
 	if len(o) > 0 {
 		options = o[0]
@@ -69,8 +69,8 @@ func getResponce(u string, domain string, o ...SendReqOptions) (*http.Response, 
 	return resp, nil
 }
 
-// sendRequest обрабатывает запрос
-func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
+// getResponceBody обрабатывает запрос
+func getResponceBody(u string, o ...SendReqOptions) (*http.Response, error) {
 	var options SendReqOptions
 	if len(o) > 0 {
 		options = o[0]
@@ -85,7 +85,7 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 	host := un.Hostname()
 
 	// Получаем ответ
-	resp, err := getResponce(u, host, options)
+	resp, err := sendRequest(u, host, options)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +97,7 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 		// Получаем timeout
 		keepAlive := resp.Header.Values("Keep-Alive")
 		retryAfter := resp.Header.Values("Retry-After")
+
 		// Timeout
 		var count int
 
@@ -118,7 +119,6 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 			}
 		} else {
 			// По умолчанию
-
 			count = 60
 		}
 		fmt.Printf("Timeout is %v seconds\n", count)
@@ -129,7 +129,7 @@ func sendRequest(u string, o ...SendReqOptions) (*http.Response, error) {
 		// Пытаемся получить хороший ответ от сервера
 		for resp.StatusCode != 200 {
 			time.Sleep(time.Duration(count) * time.Second)
-			resp, err = getResponce(u, host, options)
+			resp, err = sendRequest(u, host, options)
 			if err != nil {
 				fmt.Println(err)
 			}

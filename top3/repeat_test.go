@@ -60,8 +60,8 @@ var testPopular = popularStruct{
 	max: 4,
 }
 
-func TestGetPopularWords(t *testing.T) {
-	allWords, max := getPopularWords(testPopular.text)
+func TestGetRating(t *testing.T) {
+	allWords, max := getRating(testPopular.text)
 	if max != testPopular.max {
 		t.Errorf("Max not valid")
 	}

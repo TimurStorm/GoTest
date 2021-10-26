@@ -30,8 +30,8 @@ type GetTopOptions struct {
 	Client       http.Client
 }
 
-// GetTopWords Возвращает топ 3 слов текста по упоминаниям и их количество
-func GetTopWords(text string) ([3]string, [3]int, error) {
+// GetPopularWords возвращает топ 3 слов текста по упоминаниям и их количество
+func GetPopularWords(text string) ([3]string, [3]int, error) {
 
 	// Итоговые топ 3 слова
 	var resWords [3]string
@@ -40,7 +40,7 @@ func GetTopWords(text string) ([3]string, [3]int, error) {
 	var resCount [3]int
 
 	// Определяем популярные слова и максимальное их значение
-	wordCount, maxCount := getPopularWords(text)
+	wordCount, maxCount := getRating(text)
 
 	// Отбираем топ 3 слова
 	for nodeCount := 0; nodeCount < 3 && maxCount != 0; {
@@ -60,8 +60,8 @@ func GetTopWords(text string) ([3]string, [3]int, error) {
 	return resWords, resCount, nil
 }
 
-// GetText возвращает текст запроса
-func GetText(responce *http.Response, tags ...string) (string, error) {
+// ExtractText возвращает текст запроса
+func ExtractText(responce *http.Response, tags ...string) (string, error) {
 	// Результат
 	var result string
 	// Теги
@@ -126,19 +126,19 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 	fmt.Printf("REQUEST %v \n", url)
 
 	// Отправляем запрос
-	resp, err := sendRequest(url, SendReqOptions{Client: &options.Client, HostReqLimit: options.HostReqLimit})
+	resp, err := getResponceBody(url, SendReqOptions{Client: &options.Client, HostReqLimit: options.HostReqLimit})
 	if err != nil {
 		return Result{}, err
 	}
 
-	// Получаем текст
-	text, err := GetText(resp, options.Tags...)
+	// Получаем текст из запроса
+	text, err := ExtractText(resp, options.Tags...)
 	if err != nil {
 		return Result{}, err
 	}
 
 	// Получаем топ 3 слова
-	words, count, err := GetTopWords(text)
+	words, count, err := GetPopularWords(text)
 	if err != nil {
 		return Result{}, err
 	}
@@ -148,8 +148,8 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 	return result, nil
 }
 
-// GetTopForFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
-func GetTopForFile(urlFileName string, resultFileName string, o ...GetTopOptions) error {
+// GetTopFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
+func GetTopFile(urlFileName string, resultFileName string, o ...GetTopOptions) error {
 	var options GetTopOptions
 	if len(o) > 0 {
 		options = o[0]

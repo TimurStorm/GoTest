@@ -42,7 +42,7 @@ func TestGetText(t *testing.T) {
 			t.Errorf("Ошибка отправки запроса: %v для %v", err, test.Url)
 		}
 
-		text, err := GetText(resp, test.Tags...)
+		text, err := ExtractText(resp, test.Tags...)
 		if err != nil {
 			t.Errorf("Ошибка получения текста: %v для %v", err, test.Url)
 		}
@@ -80,9 +80,9 @@ var TestTex = []TestWords{
 	},
 }
 
-func TestGetTopWords(t *testing.T) {
+func TestGetPopularWords(t *testing.T) {
 	for index, test := range TestTex {
-		words, count, err := GetTopWords(test.Text)
+		words, count, err := GetPopularWords(test.Text)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -123,12 +123,12 @@ func TestGetTopForFile(t *testing.T) {
 				t.Error("Can't convert limit to int")
 			}
 
-			err = GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: count})
+			err = GetTopFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: count})
 			if err != nil {
 				fmt.Println(err)
 			}
 		} else {
-			err := GetTopForFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}})
+			err := GetTopFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}})
 			if err != nil {
 				fmt.Println(err)
 			}

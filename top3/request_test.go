@@ -47,7 +47,7 @@ var TestResponceData = []TestResponce{
 	},
 }
 
-func TestGetResponce(t *testing.T) {
+func TestSendRequest(t *testing.T) {
 	HostsMutex.Lock()
 	Hosts["fabulae.ru"] = 0
 	HostsMutex.Unlock()
@@ -56,7 +56,7 @@ func TestGetResponce(t *testing.T) {
 		wg.Add(1)
 		go func(test TestResponce) {
 			defer wg.Done()
-			resp, err := getResponce(test.Url, test.Domain, test.Options)
+			resp, err := sendRequest(test.Url, test.Domain, test.Options)
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -69,7 +69,7 @@ func TestGetResponce(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSendRequest(t *testing.T) {
+func TestGetResponceBody(t *testing.T) {
 	HostsMutex.Lock()
 	Hosts["www.avito.ru"] = 0
 	HostsMutex.Unlock()
@@ -90,7 +90,7 @@ func TestSendRequest(t *testing.T) {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			resp, err := sendRequest(url, SendReqOptions{Client: new(http.Client), HostReqLimit: 5})
+			resp, err := getResponceBody(url, SendReqOptions{Client: new(http.Client), HostReqLimit: 5})
 			if err != nil {
 				t.Errorf("Ошибка отправки запроса: %v", err)
 				return
