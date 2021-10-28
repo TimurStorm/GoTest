@@ -9,16 +9,11 @@ import (
 	"time"
 )
 
-type SendReqOptions struct {
-	Client       *http.Client
-	HostReqLimit int
-}
-
 // sendRequest отправляет запрос
-func sendRequest(u string, domain string, o ...SendReqOptions) (*http.Response, error) {
-	var options SendReqOptions
-	if len(o) > 0 {
-		options = o[0]
+func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
+	options := &AllOptions{}
+	for _, opt := range o {
+		opt(options)
 	}
 	var resp *http.Response
 
@@ -70,10 +65,10 @@ func sendRequest(u string, domain string, o ...SendReqOptions) (*http.Response, 
 }
 
 // getResponceBody обрабатывает запрос
-func getResponceBody(u string, o ...SendReqOptions) (*http.Response, error) {
-	var options SendReqOptions
-	if len(o) > 0 {
-		options = o[0]
+func getResponceBody(u string, o ...Option) (*http.Response, error) {
+	options := &AllOptions{}
+	for _, opt := range o {
+		opt(options)
 	}
 
 	// Получаем хост
@@ -85,7 +80,7 @@ func getResponceBody(u string, o ...SendReqOptions) (*http.Response, error) {
 	host := un.Hostname()
 
 	// Получаем ответ
-	resp, err := sendRequest(u, host, options)
+	resp, err := sendRequest(u, host, o...)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +124,7 @@ func getResponceBody(u string, o ...SendReqOptions) (*http.Response, error) {
 		// Пытаемся получить хороший ответ от сервера
 		for resp.StatusCode != 200 {
 			time.Sleep(time.Duration(count) * time.Second)
-			resp, err = sendRequest(u, host, options)
+			resp, err = sendRequest(u, host, o...)
 			if err != nil {
 				fmt.Println(err)
 			}

@@ -14,7 +14,7 @@ func main() {
 
 	// Для измерения времени
 	start := time.Now()
-	err := top3.GetTopForFile("url.txt", "result.json", top3.GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: 10})
+	err := top3.GetTopFile("url.txt", "result.json", top3.WithTags([]string{"p", "a"}), top3.WithHostReqLimit(10))
 	if err != nil {
 		fmt.Println(err)
 	}

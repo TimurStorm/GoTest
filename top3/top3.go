@@ -24,10 +24,30 @@ type Result struct {
 	Count [3]int
 }
 
-type GetTopOptions struct {
+type AllOptions struct {
 	Tags         []string
 	HostReqLimit int
 	Client       http.Client
+}
+
+type Option func(*AllOptions)
+
+func WithTags(t []string) Option {
+	return func(opts *AllOptions) {
+		opts.Tags = t
+	}
+}
+
+func WithHostReqLimit(lim int) Option {
+	return func(opts *AllOptions) {
+		opts.HostReqLimit = lim
+	}
+}
+
+func WithClient(c http.Client) Option {
+	return func(opts *AllOptions) {
+		opts.Client = c
+	}
 }
 
 // GetPopularWords возвращает топ 3 слов текста по упоминаниям и их количество
@@ -118,15 +138,15 @@ func ExtractText(responce *http.Response, tags ...string) (string, error) {
 }
 
 // GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
-func GetTop(url string, o ...GetTopOptions) (Result, error) {
-	var options GetTopOptions
-	if len(o) > 0 {
-		options = o[0]
+func GetTop(url string, o ...Option) (Result, error) {
+	options := &AllOptions{}
+	for _, opt := range o {
+		opt(options)
 	}
 	fmt.Printf("REQUEST %v \n", url)
 
 	// Отправляем запрос
-	resp, err := getResponceBody(url, SendReqOptions{Client: &options.Client, HostReqLimit: options.HostReqLimit})
+	resp, err := getResponceBody(url, WithClient(options.Client), WithHostReqLimit(options.HostReqLimit))
 	if err != nil {
 		return Result{}, err
 	}
@@ -149,10 +169,10 @@ func GetTop(url string, o ...GetTopOptions) (Result, error) {
 }
 
 // GetTopFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
-func GetTopFile(urlFileName string, resultFileName string, o ...GetTopOptions) error {
-	var options GetTopOptions
-	if len(o) > 0 {
-		options = o[0]
+func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
+	options := &AllOptions{}
+	for _, opt := range o {
+		opt(options)
 	}
 	// Устанавливаем клиент
 	options.Client = http.Client{Timeout: time.Duration(5) * time.Second}
@@ -208,7 +228,7 @@ func GetTopFile(urlFileName string, resultFileName string, o ...GetTopOptions) e
 					// Получаем результат
 					var result Result
 					var err error
-					result, err = GetTop(url, options)
+					result, err = GetTop(url, o...)
 					if err != nil {
 						err = fmt.Errorf("error: %v url: %v", err, url)
 						fmt.Println(err)
