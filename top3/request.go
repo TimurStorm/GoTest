@@ -44,7 +44,7 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 		HostsMutex.Unlock()
 
 		// Отправка запроса
-		resp, err := http.Get(u)
+		resp, err := options.Client.Get(u)
 
 		// - 1 запрос
 		HostsMutex.Lock()
@@ -57,7 +57,7 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 		return resp, nil
 	}
 	// Стандартный метод отправки
-	resp, err := http.Get(u)
+	resp, err := options.Client.Get(u)
 	if err != nil {
 		return resp, err
 	}

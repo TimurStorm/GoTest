@@ -80,8 +80,8 @@ func GetPopularWords(text string) ([3]string, [3]int, error) {
 	return resWords, resCount, nil
 }
 
-// ExtractText возвращает текст запроса
-func ExtractText(responce *http.Response, tags ...string) (string, error) {
+// extractText возвращает текст запроса
+func extractText(responce *http.Response, tags ...string) (string, error) {
 	// Результат
 	var result string
 	// Теги
@@ -152,7 +152,7 @@ func GetTop(url string, o ...Option) (Result, error) {
 	}
 
 	// Получаем текст из запроса
-	text, err := ExtractText(resp, options.Tags...)
+	text, err := extractText(resp, options.Tags...)
 	if err != nil {
 		return Result{}, err
 	}
@@ -174,8 +174,12 @@ func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
 	for _, opt := range o {
 		opt(options)
 	}
-	// Устанавливаем клиент
-	options.Client = http.Client{Timeout: time.Duration(5) * time.Second}
+
+	if options.Client.Timeout == 0 {
+		options.Client.Timeout = 5 * time.Second
+	}
+
+	fmt.Println(options.Client)
 
 	// Если задан лимит запросов на один хост
 	if options.HostReqLimit != 0 {
