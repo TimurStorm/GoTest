@@ -18,12 +18,6 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	result, err := top3.GetTop("https://habr.com/ru/post/578414/")
-
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(result)
 
 	// Вывод затраченного времени
 	fmt.Printf("Time spend: %v", time.Since(start))

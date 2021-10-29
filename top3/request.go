@@ -11,45 +11,54 @@ import (
 
 // sendRequest отправляет запрос
 func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
+
 	options := &AllOptions{}
 	for _, opt := range o {
 		opt(options)
 	}
-	var resp *http.Response
 
+	var resp *http.Response
+	request, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
 	// Проверяем наличие хоста в мапе повторяющихся
-	HostsMutex.Lock()
-	_, domainContain := Hosts[domain]
-	HostsMutex.Unlock()
+	// Получаем количество подключений к данному хосту
+	options.hosts.MapMutex.Lock()
+	hostCount, domainContain := options.hosts.Map[domain]
+	options.hosts.MapMutex.Unlock()
+
+	if !domainContain {
+		resp, err := options.Client.Do(request)
+		if err != nil {
+			return resp, err
+		}
+		return resp, nil
+	}
 
 	// Если хост в мапе повторяющихся
 	if domainContain && options.HostReqLimit != 0 {
 
-		// Получаем количество подключений к данному хосту
-		HostsMutex.Lock()
-		hostCount := Hosts[domain]
-		HostsMutex.Unlock()
-
 		// Ожидание пока не освободится место новому запросу
 		for hostCount >= options.HostReqLimit {
 			time.Sleep(100 * time.Millisecond)
-			HostsMutex.Lock()
-			hostCount = Hosts[domain]
-			HostsMutex.Unlock()
+			options.hosts.MapMutex.Lock()
+			hostCount = options.hosts.Map[domain]
+			options.hosts.MapMutex.Unlock()
 		}
 
 		// + 1 запрос
-		HostsMutex.Lock()
-		Hosts[domain] += 1
-		HostsMutex.Unlock()
+		options.hosts.MapMutex.Lock()
+		options.hosts.Map[domain] += 1
+		options.hosts.MapMutex.Unlock()
 
 		// Отправка запроса
-		resp, err := options.Client.Get(u)
+		resp, err := options.Client.Do(request)
 
 		// - 1 запрос
-		HostsMutex.Lock()
-		Hosts[domain] -= 1
-		HostsMutex.Unlock()
+		options.hosts.MapMutex.Lock()
+		options.hosts.Map[domain] -= 1
+		options.hosts.MapMutex.Unlock()
 
 		if err != nil {
 			return resp, err
@@ -57,15 +66,13 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 		return resp, nil
 	}
 	// Стандартный метод отправки
-	resp, err := options.Client.Get(u)
-	if err != nil {
-		return resp, err
-	}
+
 	return resp, nil
 }
 
 // getResponceBody обрабатывает запрос
 func getResponceBody(u string, o ...Option) (*http.Response, error) {
+
 	options := &AllOptions{}
 	for _, opt := range o {
 		opt(options)

@@ -15,8 +15,13 @@ import (
 	"jaytaylor.com/html2text"
 )
 
-var HostsMutex = new(sync.Mutex)
-var Hosts = make(map[string]int)
+// var HostsMutex = new(sync.Mutex)
+// var Hosts = make(map[string]int)
+
+type hosts struct {
+	MapMutex *sync.RWMutex
+	Map      map[string]int
+}
 
 type Result struct {
 	Url   string
@@ -28,6 +33,7 @@ type AllOptions struct {
 	Tags         []string
 	HostReqLimit int
 	Client       http.Client
+	hosts        *hosts
 }
 
 type Option func(*AllOptions)
@@ -47,6 +53,12 @@ func WithHostReqLimit(lim int) Option {
 func WithClient(c http.Client) Option {
 	return func(opts *AllOptions) {
 		opts.Client = c
+	}
+}
+
+func withHosts(h *hosts) Option {
+	return func(opts *AllOptions) {
+		opts.hosts = h
 	}
 }
 
@@ -146,7 +158,7 @@ func GetTop(url string, o ...Option) (Result, error) {
 	fmt.Printf("REQUEST %v \n", url)
 
 	// Отправляем запрос
-	resp, err := getResponceBody(url, WithClient(options.Client), WithHostReqLimit(options.HostReqLimit))
+	resp, err := getResponceBody(url, WithClient(options.Client), WithHostReqLimit(options.HostReqLimit), withHosts(options.hosts))
 	if err != nil {
 		return Result{}, err
 	}
@@ -179,18 +191,20 @@ func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
 		options.Client.Timeout = 5 * time.Second
 	}
 
-	fmt.Println(options.Client)
-
-	// Если задан лимит запросов на один хост
+	// Если задан лимит запросов на хост
 	if options.HostReqLimit != 0 {
+		options.hosts = &hosts{MapMutex: new(sync.RWMutex), Map: make(map[string]int)}
 		repeated, err := getRepeatedHosts(urlFileName)
 		if err != nil {
 			return err
 		}
 		for _, host := range repeated {
-			Hosts[host] = 0
+			options.hosts.Map[host] = 0
 		}
 	}
+	o = append(o, withHosts(options.hosts))
+
+	fmt.Println(options)
 
 	// Открываем файл с урлами
 	urlFile, err := os.Open(urlFileName)
