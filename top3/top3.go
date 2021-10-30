@@ -20,7 +20,7 @@ import (
 
 type hosts struct {
 	MapMutex *sync.RWMutex
-	Map      map[string]int
+	Map      map[string]uint
 }
 
 type Result struct {
@@ -31,9 +31,10 @@ type Result struct {
 
 type AllOptions struct {
 	Tags         []string
-	HostReqLimit int
+	HostReqLimit uint
 	Client       http.Client
 	hosts        *hosts
+	AttemptCount uint
 }
 
 type Option func(*AllOptions)
@@ -44,7 +45,7 @@ func WithTags(t []string) Option {
 	}
 }
 
-func WithHostReqLimit(lim int) Option {
+func WithHostReqLimit(lim uint) Option {
 	return func(opts *AllOptions) {
 		opts.HostReqLimit = lim
 	}
@@ -59,6 +60,12 @@ func WithClient(c http.Client) Option {
 func withHosts(h *hosts) Option {
 	return func(opts *AllOptions) {
 		opts.hosts = h
+	}
+}
+
+func WithAttemptCount(c uint) Option {
+	return func(opts *AllOptions) {
+		opts.AttemptCount = c
 	}
 }
 
@@ -193,7 +200,7 @@ func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
 
 	// Если задан лимит запросов на хост
 	if options.HostReqLimit != 0 {
-		options.hosts = &hosts{MapMutex: new(sync.RWMutex), Map: make(map[string]int)}
+		options.hosts = &hosts{MapMutex: new(sync.RWMutex), Map: make(map[string]uint)}
 		repeated, err := getRepeatedHosts(urlFileName)
 		if err != nil {
 			return err

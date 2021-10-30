@@ -17,57 +17,70 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 		opt(options)
 	}
 
-	var resp *http.Response
+	// Создаём запрос
 	request, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, err
 	}
-	// Проверяем наличие хоста в мапе повторяющихся
-	// Получаем количество подключений к данному хосту
-	options.hosts.MapMutex.Lock()
-	hostCount, domainContain := options.hosts.Map[domain]
-	options.hosts.MapMutex.Unlock()
 
-	if !domainContain {
+	//Если нет ограничений на отправку запросов на 1 хост
+	//Просто отправляем запрос
+	if options.HostReqLimit == 0 {
+
 		resp, err := options.Client.Do(request)
 		if err != nil {
 			return resp, err
 		}
 		return resp, nil
-	}
 
-	// Если хост в мапе повторяющихся
-	if domainContain && options.HostReqLimit != 0 {
+	} else {
 
-		// Ожидание пока не освободится место новому запросу
-		for hostCount >= options.HostReqLimit {
-			time.Sleep(100 * time.Millisecond)
-			options.hosts.MapMutex.Lock()
-			hostCount = options.hosts.Map[domain]
-			options.hosts.MapMutex.Unlock()
+		//Для облегчения читаймости
+		hosts := options.hosts
+
+		// Проверяем наличие хоста в мапе повторяющихся
+		// Получаем количество подключений к данному хосту
+		hosts.MapMutex.Lock()
+		hostCount, contain := hosts.Map[domain]
+		hosts.MapMutex.Unlock()
+
+		// Если не в мапе
+		if !contain {
+			resp, err := options.Client.Do(request)
+			if err != nil {
+				return resp, err
+			}
+
+			return resp, nil
+		} else {
+
+			// Ожидание пока не освободится место новому запросу
+			for hostCount >= options.HostReqLimit {
+				time.Sleep(100 * time.Millisecond)
+				hosts.MapMutex.Lock()
+				hostCount = hosts.Map[domain]
+				hosts.MapMutex.Unlock()
+			}
+
+			// + 1 запрос
+			hosts.MapMutex.Lock()
+			hosts.Map[domain] += 1
+			hosts.MapMutex.Unlock()
+
+			// Отправка запроса
+			resp, err := options.Client.Do(request)
+
+			// - 1 запрос
+			hosts.MapMutex.Lock()
+			hosts.Map[domain] -= 1
+			hosts.MapMutex.Unlock()
+
+			if err != nil {
+				return resp, err
+			}
+			return resp, nil
 		}
-
-		// + 1 запрос
-		options.hosts.MapMutex.Lock()
-		options.hosts.Map[domain] += 1
-		options.hosts.MapMutex.Unlock()
-
-		// Отправка запроса
-		resp, err := options.Client.Do(request)
-
-		// - 1 запрос
-		options.hosts.MapMutex.Lock()
-		options.hosts.Map[domain] -= 1
-		options.hosts.MapMutex.Unlock()
-
-		if err != nil {
-			return resp, err
-		}
-		return resp, nil
 	}
-	// Стандартный метод отправки
-
-	return resp, nil
 }
 
 // getResponceBody обрабатывает запрос
@@ -126,10 +139,13 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 		fmt.Printf("Timeout is %v seconds\n", count)
 
 		// Счётчик попыток
-		num := 1
+		var num uint = 0
 
 		// Пытаемся получить хороший ответ от сервера
 		for resp.StatusCode != 200 {
+			if options.AttemptCount != 0 && options.AttemptCount < num {
+				break
+			}
 			time.Sleep(time.Duration(count) * time.Second)
 			resp, err = sendRequest(u, host, o...)
 			if err != nil {
