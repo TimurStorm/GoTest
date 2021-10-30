@@ -30,11 +30,12 @@ type Result struct {
 }
 
 type AllOptions struct {
-	Tags         []string
-	HostReqLimit uint
-	Client       http.Client
-	hosts        *hosts
-	AttemptCount uint
+	Tags           []string
+	HostReqLimit   uint
+	Client         http.Client
+	hosts          *hosts
+	AttemptCount   uint
+	AttemptTimeout time.Duration
 }
 
 type Option func(*AllOptions)
@@ -66,6 +67,12 @@ func withHosts(h *hosts) Option {
 func WithAttemptCount(c uint) Option {
 	return func(opts *AllOptions) {
 		opts.AttemptCount = c
+	}
+}
+
+func WithAttemptTimeout(t time.Duration) Option {
+	return func(opts *AllOptions) {
+		opts.AttemptTimeout = t
 	}
 }
 

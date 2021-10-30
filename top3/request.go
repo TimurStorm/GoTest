@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/manucorporat/try"
 )
 
 // sendRequest отправляет запрос
@@ -107,36 +108,37 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 
 	// В случае если было отправлено большое количество запросов в ближайшее время
 	if resp.StatusCode == 503 || resp.StatusCode == 429 {
-		fmt.Printf("'%v' was received. Attempt to resend the request %v \n", resp.Status, u)
+		fmt.Printf("'%v' было получено. Попытка повторного отправки запроса на %v \n", resp.Status, u)
 
 		// Получаем timeout
-		keepAlive := resp.Header.Values("Keep-Alive")
 		retryAfter := resp.Header.Values("Retry-After")
 
 		// Timeout
-		var count int
-
-		if len(keepAlive) > 0 {
-			// Если был найден Keep-Alive в заголовках ответа
-
-			timeout := strings.ReplaceAll(keepAlive[0], "timeout=", "")
-			count, err = strconv.Atoi(timeout)
-			if err != nil {
-				fmt.Println(err)
-			}
-
-		} else if len(retryAfter) > 0 {
-			// Если был найден Retry-After в заголовках ответа
-
-			count, err = strconv.Atoi(retryAfter[0])
-			if err != nil {
-				fmt.Println(err)
-			}
-		} else {
-			// По умолчанию
-			count = 60
+		var timeout = options.AttemptTimeout
+		if timeout == 0 {
+			timeout = 15 * time.Second
 		}
-		fmt.Printf("Timeout is %v seconds\n", count)
+
+		// Если был найден Retry-After в заголовках ответа
+		if len(retryAfter) > 0 {
+			try.This(func() {
+				count, err := strconv.Atoi(retryAfter[0])
+				if err != nil {
+					panic(err)
+				}
+				timeout = time.Duration(count) * time.Second
+				fmt.Println(timeout)
+
+			}).Catch(func(e try.E) {
+				t, err := time.Parse(time.RFC1123, retryAfter[0])
+				if err != nil {
+					panic(err)
+				}
+				timeout = time.Since(t)
+				fmt.Println(timeout)
+			})
+		}
+		fmt.Printf("Таймаут - %v\n", timeout)
 
 		// Счётчик попыток
 		var num uint = 0
@@ -146,24 +148,24 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 			if options.AttemptCount != 0 && options.AttemptCount < num {
 				break
 			}
-			time.Sleep(time.Duration(count) * time.Second)
+			time.Sleep(timeout)
 			resp, err = sendRequest(u, host, o...)
 			if err != nil {
-				fmt.Println(err)
+				return nil, err
 			}
 
 			// Если была не найдена старница, невалиден запрос, запрещён доступ к ресурсу
 			if resp.StatusCode == 404 || resp.StatusCode == 400 || resp.StatusCode == 403 {
 				break
 			}
-			fmt.Printf("Try %v for %v status %v \n", num, u, resp.Status)
+			fmt.Printf("Попытка %v для %v статус %v \n", num, u, resp.Status)
 			num++
 		}
-	}
 
-	if resp.StatusCode != 200 {
-		// keepAlive := resp.Header.Values("keep-alive")
-		return nil, fmt.Errorf("http: %v ", resp.Status)
+		if resp.StatusCode != 200 {
+			// keepAlive := resp.Header.Values("keep-alive")
+			return nil, fmt.Errorf("http: %v ", resp.Status)
+		}
 	}
 	return resp, nil
 }
