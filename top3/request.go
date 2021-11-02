@@ -2,6 +2,7 @@ package top3
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -85,7 +86,7 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 }
 
 // getResponceBody обрабатывает запрос
-func getResponceBody(u string, o ...Option) (*http.Response, error) {
+func getResponceBody(u string, o ...Option) ([]byte, error) {
 
 	options := &AllOptions{}
 	for _, opt := range o {
@@ -106,6 +107,8 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 		return nil, err
 	}
 
+	defer resp.Body.Close()
+
 	// В случае если было отправлено большое количество запросов в ближайшее время
 	if resp.StatusCode == 503 || resp.StatusCode == 429 {
 		fmt.Printf("'%v' было получено. Попытка повторного отправки запроса на %v \n", resp.Status, u)
@@ -116,7 +119,7 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 		// Timeout
 		var timeout = options.AttemptTimeout
 		if timeout == 0 {
-			timeout = 15 * time.Second
+			timeout = 7 * time.Second
 		}
 
 		// Если был найден Retry-After в заголовках ответа
@@ -127,15 +130,12 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 					panic(err)
 				}
 				timeout = time.Duration(count) * time.Second
-				fmt.Println(timeout)
-
 			}).Catch(func(e try.E) {
 				t, err := time.Parse(time.RFC1123, retryAfter[0])
 				if err != nil {
 					panic(err)
 				}
 				timeout = time.Since(t)
-				fmt.Println(timeout)
 			})
 		}
 		fmt.Printf("Таймаут - %v\n", timeout)
@@ -167,5 +167,11 @@ func getResponceBody(u string, o ...Option) (*http.Response, error) {
 			return nil, fmt.Errorf("http: %v ", resp.Status)
 		}
 	}
-	return resp, nil
+
+	respByte, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return respByte, nil
 }

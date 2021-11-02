@@ -2,19 +2,17 @@ package main
 
 import (
 	"fmt"
+	"main/top3"
 	"runtime"
 	"time"
-
-	"main/top3"
 )
 
 func main() {
 	// Используем 1 ядро процессора
 	runtime.GOMAXPROCS(1)
-
 	// Для измерения времени
 	start := time.Now()
-	err := top3.GetTopFile("url.txt", "result.json", top3.WithTags([]string{"p", "a"}), top3.WithHostReqLimit(10))
+	err := top3.GetTopFile("url.txt", "result.json", top3.WithTags([]string{"p", "a"}))
 	if err != nil {
 		fmt.Println(err)
 	}

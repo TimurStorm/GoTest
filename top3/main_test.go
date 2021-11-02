@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
-	"strconv"
 	"testing"
 )
 
@@ -30,19 +30,25 @@ var TestUrls = []TestText{
 			"h1",
 		},
 		Text:  "Собака Сталина",
-		Words: [3]string{"собака", "сталина", ""},
-		Count: [3]int{1, 1, 0},
+		Words: [3]string{"собак", "собака", "миша"},
+		Count: [3]int{34, 19, 18},
 	},
 }
 
-func TestGetText(t *testing.T) {
+func TestExtractText(t *testing.T) {
 	for index, test := range TestUrls {
 		resp, err := http.Get(test.Url)
 		if err != nil {
 			t.Errorf("Ошибка отправки запроса: %v для %v", err, test.Url)
 		}
 
-		text, err := ExtractText(resp, test.Tags...)
+		respByte, err := ioutil.ReadAll(resp.Body)
+
+		if err != nil {
+			t.Errorf("Ошибка конвертации в байты: %v для %v", err, test.Url)
+		}
+
+		text, err := extractText(respByte, test.Tags...)
 		if err != nil {
 			t.Errorf("Ошибка получения текста: %v для %v", err, test.Url)
 		}
@@ -97,7 +103,7 @@ func TestGetPopularWords(t *testing.T) {
 
 func TestGetTop(t *testing.T) {
 	for _, test := range TestUrls {
-		top, err := GetTop(test.Url, GetTopOptions{Tags: test.Tags})
+		top, err := GetTop(test.Url)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -117,21 +123,9 @@ var simpleFiles = [][]string{
 
 func TestGetTopForFile(t *testing.T) {
 	for _, files := range simpleFiles {
-		if len(files) > 2 {
-			count, err := strconv.Atoi(files[2])
-			if err != nil {
-				t.Error("Can't convert limit to int")
-			}
-
-			err = GetTopFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}, HostReqLimit: count})
-			if err != nil {
-				fmt.Println(err)
-			}
-		} else {
-			err := GetTopFile(files[0], files[1], GetTopOptions{Tags: []string{"p", "a"}})
-			if err != nil {
-				fmt.Println(err)
-			}
+		err := GetTopFile(files[0], files[1])
+		if err != nil {
+			fmt.Println(err)
 		}
 
 		resultFile, err := os.Open("result_test.json")
