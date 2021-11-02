@@ -2,6 +2,7 @@ package top3
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -107,7 +108,7 @@ func GetPopularWords(text string) ([3]string, [3]int, error) {
 }
 
 // extractText возвращает текст запроса
-func extractText(responce *http.Response, tags ...string) (string, error) {
+func extractText(responceData []byte, tags ...string) (string, error) {
 	// Результат
 	var result string
 	// Теги
@@ -127,7 +128,7 @@ func extractText(responce *http.Response, tags ...string) (string, error) {
 	}
 
 	// Считываем тело запроса
-	doc, err := goquery.NewDocumentFromReader(responce.Body)
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(responceData))
 	if err != nil {
 		return "", err
 	}
