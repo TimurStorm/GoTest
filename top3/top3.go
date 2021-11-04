@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/sync/errgroup"
 	"jaytaylor.com/html2text"
 )
 
@@ -139,6 +138,14 @@ func extractText(responceData []byte, tags ...string) (string, error) {
 		return "", err
 	}
 	if strings.Contains(bodyHTML, "div") && len(t) > 0 {
+		tagFilter := func(html string) {
+			if !(strings.Contains(html, "div")) && !(strings.Contains(html, "script")) {
+				err = textFrom(html)
+				if err != nil {
+					divErr = nil
+				}
+			}
+		}
 		// Для каждого тега в файле получаем его html-вёрстку, из которой получаем текст
 		for _, tag := range t {
 			doc.Find(tag).Each(func(index int, item *goquery.Selection) {
@@ -146,12 +153,7 @@ func extractText(responceData []byte, tags ...string) (string, error) {
 				if err != nil {
 					divErr = nil
 				}
-				if !(strings.Contains(html, "div")) && !(strings.Contains(html, "script")) {
-					err = textFrom(html)
-					if err != nil {
-						divErr = nil
-					}
-				}
+				tagFilter(html)
 			})
 		}
 		if divErr != nil {
@@ -219,8 +221,6 @@ func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
 	}
 	o = append(o, withHosts(options.hosts))
 
-	fmt.Println(options)
-
 	// Открываем файл с урлами
 	urlFile, err := os.Open(urlFileName)
 	if err != nil {
@@ -243,7 +243,7 @@ func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
 	scanner := bufio.NewScanner(urlFile)
 
 	// Инициализируем errgroup
-	var wg errgroup.Group
+	c := make(chan error)
 
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
@@ -254,35 +254,34 @@ func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
 		if err != nil {
 			return err
 		}
-
-		if url != "" {
-			wg.Go(
-				func() error {
-					// Получаем результат
-					var result Result
-					var err error
-					result, err = GetTop(url, o...)
-					if err != nil {
-						err = fmt.Errorf("error: %v url: %v", err, url)
-						fmt.Println(err)
-						return err
-					}
-
-					// Записываем результат
-					err = encoder.Encode(result)
-					if err != nil {
-						err = fmt.Errorf("error: %v url: %v", err, url)
-						fmt.Println(err)
-						return err
-					}
-					return nil
-				})
+		go process(url, c, encoder, o...)
+		err = <-c
+		if err != nil {
+			return err
 		}
-	}
-	err = wg.Wait()
-	if err != nil {
-		return err
 	}
 
 	return nil
+}
+
+func process(url string, c chan error, encoder *json.Encoder, o ...Option) {
+	// Получаем результат
+	var result Result
+	var err error
+	result, err = GetTop(url, o...)
+	if err != nil {
+		err = fmt.Errorf("error: %v url: %v", err, url)
+		fmt.Println(err)
+		c <- err
+	}
+
+	// Записываем результат
+	err = encoder.Encode(result)
+	if err != nil {
+		err = fmt.Errorf("error: %v url: %v", err, url)
+		fmt.Println(err)
+		c <- err
+	}
+
+	c <- err
 }
