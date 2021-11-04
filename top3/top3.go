@@ -166,8 +166,8 @@ func extractText(responceData []byte, tags ...string) (string, error) {
 	return result, nil
 }
 
-// GetTop возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
-func GetTop(url string, o ...Option) (Result, error) {
+// URL возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
+func URL(url string, o ...Option) (Result, error) {
 	options := &AllOptions{}
 	for _, opt := range o {
 		opt(options)
@@ -197,8 +197,8 @@ func GetTop(url string, o ...Option) (Result, error) {
 	return result, nil
 }
 
-// GetTopFile сканирует файл urlFileName и для каждого url производит GetTop. Результат записывается в resultFileName
-func GetTopFile(urlFileName string, resultFileName string, o ...Option) error {
+// ForFile сканирует файл urlFileName и для каждого url производит URL. Результат записывается в resultFileName
+func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	options := &AllOptions{}
 	for _, opt := range o {
 		opt(options)
@@ -268,7 +268,7 @@ func process(url string, c chan error, encoder *json.Encoder, o ...Option) {
 	// Получаем результат
 	var result Result
 	var err error
-	result, err = GetTop(url, o...)
+	result, err = URL(url, o...)
 	if err != nil {
 		err = fmt.Errorf("error: %v url: %v", err, url)
 		fmt.Println(err)

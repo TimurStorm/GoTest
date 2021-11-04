@@ -101,9 +101,9 @@ func TestGetPopularWords(t *testing.T) {
 	}
 }
 
-func TestGetTop(t *testing.T) {
+func TestURL(t *testing.T) {
 	for _, test := range TestUrls {
-		top, err := GetTop(test.Url)
+		top, err := URL(test.Url)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -123,7 +123,7 @@ var simpleFiles = [][]string{
 
 func TestGetTopForFile(t *testing.T) {
 	for _, files := range simpleFiles {
-		err := GetTopFile(files[0], files[1])
+		err := ForFile(files[0], files[1])
 		if err != nil {
 			t.Error("GetTopFile error", err)
 		}

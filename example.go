@@ -8,14 +8,14 @@ import (
 )
 
 func exampleTopFile() {
-	err := top3.GetTopFile("url.txt", "result.json", top3.WithTags([]string{"p", "a"}))
+	err := top3.ForFile("url.txt", "result.json", top3.WithTags([]string{"p", "a"}))
 	if err != nil {
 		panic(err)
 	}
 }
 
 func exampleTopURL() {
-	result, err := top3.GetTop("https://habr.com/ru/feed/")
+	result, err := top3.URL("https://habr.com/ru/feed/")
 	if err != nil {
 		panic(err)
 	}
