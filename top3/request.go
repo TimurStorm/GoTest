@@ -27,6 +27,7 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 
 	//Если нет ограничений на отправку запросов на 1 хост
 	//Просто отправляем запрос
+
 	if options.HostReqLimit == 0 {
 
 		resp, err := options.Client.Do(request)
@@ -36,15 +37,14 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 		return resp, nil
 
 	} else {
-
 		//Для облегчения читаймости
 		hosts := options.hosts
 
 		// Проверяем наличие хоста в мапе повторяющихся
 		// Получаем количество подключений к данному хосту
-		hosts.MapMutex.Lock()
+		// hosts.MapMutex.Lock()
 		hostCount, contain := hosts.Map[domain]
-		hosts.MapMutex.Unlock()
+		// hosts.MapMutex.Unlock()
 
 		// Если не в мапе
 		if !contain {
@@ -55,27 +55,28 @@ func sendRequest(u string, domain string, o ...Option) (*http.Response, error) {
 
 			return resp, nil
 		} else {
-
+			fmt.Println(hosts.Map)
 			// Ожидание пока не освободится место новому запросу
 			for hostCount >= options.HostReqLimit {
 				time.Sleep(100 * time.Millisecond)
 				hosts.MapMutex.Lock()
 				hostCount = hosts.Map[domain]
 				hosts.MapMutex.Unlock()
+				fmt.Println("В очереди")
 			}
 
 			// + 1 запрос
-			hosts.MapMutex.Lock()
+			hosts.MapMutex.RLock()
 			hosts.Map[domain] += 1
-			hosts.MapMutex.Unlock()
+			hosts.MapMutex.RUnlock()
 
 			// Отправка запроса
 			resp, err := options.Client.Do(request)
 
 			// - 1 запрос
-			hosts.MapMutex.Lock()
+			hosts.MapMutex.RLock()
 			hosts.Map[domain] -= 1
-			hosts.MapMutex.Unlock()
+			hosts.MapMutex.RUnlock()
 
 			if err != nil {
 				return resp, err
