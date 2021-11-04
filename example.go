@@ -15,7 +15,7 @@ func exampleTopFile() {
 }
 
 func exampleTopURL() {
-	result, err := top3.GetTop("habr.com")
+	result, err := top3.GetTop("https://habr.com/ru/feed/")
 	if err != nil {
 		panic(err)
 	}
