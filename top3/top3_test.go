@@ -125,7 +125,7 @@ func TestGetTopForFile(t *testing.T) {
 	for _, files := range simpleFiles {
 		err := GetTopFile(files[0], files[1])
 		if err != nil {
-			fmt.Println(err)
+			t.Error("GetTopFile error", err)
 		}
 
 		resultFile, err := os.Open("result_test.json")
