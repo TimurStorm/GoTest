@@ -1,6 +1,9 @@
 package top3
 
 import (
+	"bufio"
+	"io"
+	"os"
 	"strings"
 	"unicode"
 )
@@ -48,4 +51,33 @@ func upCount(s string) int {
 		}
 	}
 	return count
+}
+
+func lineCounter(fileName string) (int, error) {
+
+	file, err := os.Open(fileName)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+
+	var count int
+
+	for {
+
+		_, isPrefix, err := reader.ReadLine()
+
+		if !isPrefix {
+			count++
+		}
+
+		if err == io.EOF {
+			return count - 1, nil
+		} else if err != nil {
+			return count, err
+		}
+
+	}
 }

@@ -15,9 +15,6 @@ import (
 	"jaytaylor.com/html2text"
 )
 
-// var HostsMutex = new(sync.Mutex)
-// var Hosts = make(map[string]int)
-
 type hosts struct {
 	MapMutex *sync.RWMutex
 	Map      map[string]uint
@@ -31,9 +28,10 @@ type Result struct {
 
 type AllOptions struct {
 	Tags           []string
-	HostReqLimit   uint
 	Client         http.Client
 	hosts          *hosts
+	Workers        uint
+	HostReqLimit   uint
 	AttemptCount   uint
 	AttemptTimeout time.Duration
 }
@@ -73,6 +71,12 @@ func WithAttemptCount(c uint) Option {
 func WithAttemptTimeout(t time.Duration) Option {
 	return func(opts *AllOptions) {
 		opts.AttemptTimeout = t
+	}
+}
+
+func WithWorkers(w uint) Option {
+	return func(opts *AllOptions) {
+		opts.Workers = w
 	}
 }
 
@@ -199,13 +203,21 @@ func URL(url string, o ...Option) (Result, error) {
 
 // ForFile сканирует файл urlFileName и для каждого url производит URL. Результат записывается в resultFileName
 func ForFile(urlFileName string, resultFileName string, o ...Option) error {
+	// Считываем опции
 	options := &AllOptions{}
 	for _, opt := range o {
 		opt(options)
 	}
 
+	// Таймаут по умолчанию
+	// TODO: сделать более точную настройку клиента
 	if options.Client.Timeout == 0 {
 		options.Client.Timeout = 5 * time.Second
+	}
+
+	// Количество воркеров по умолчанию
+	if options.Workers == 0 {
+		options.Workers = 2
 	}
 
 	// Если задан лимит запросов на хост
@@ -233,42 +245,74 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	if err != nil {
 		return err
 	}
-
 	defer resultFile.Close()
-	defer urlFile.Close()
+
 	// Инициализируем енкодер
 	encoder := json.NewEncoder(resultFile)
+
+	// Считаем количество строк в файле
+	rowCount, err := lineCounter(urlFileName)
+	if err != nil {
+		return err
+	}
 
 	// Инициализируем сканер
 	scanner := bufio.NewScanner(urlFile)
 
-	// Инициализируем errgroup
-	c := make(chan error)
+	// Инициализируем каналы для ошибок и урлов
+	errChan := make(chan error, rowCount)
+	urlChan := make(chan string, rowCount)
+
+	// Запускаем воркеры
+	var w uint
+	for w < options.Workers {
+		go worker(urlChan, errChan, encoder, o...)
+		w += 1
+	}
 
 	// Проходимся по всем урлам в файле, для каждого определяем топ 3
 	for scanner.Scan() {
 		url := scanner.Text()
-
 		// Если была обнаружена ошибка при считывании
 		err := scanner.Err()
 		if err != nil {
 			return err
 		}
-		go process(url, c, encoder, o...)
-		err = <-c
+		urlChan <- url
+	}
+	close(urlChan)
+	// Ждём выполнения всех процессов
+	for {
+		err = <-errChan
 		if err != nil {
 			return err
 		}
+		rowCount -= 1
+		if rowCount == 0 {
+			break
+		}
 	}
-
+	close(errChan)
 	return nil
+}
+
+func worker(urlChan chan string, errChan chan error, encoder *json.Encoder, o ...Option) {
+	for {
+		url, ok := <-urlChan
+		if !ok {
+			break
+		}
+		go process(url, errChan, encoder, o...)
+	}
 }
 
 func process(url string, c chan error, encoder *json.Encoder, o ...Option) {
 	// Получаем результат
 	var result Result
 	var err error
+
 	result, err = URL(url, o...)
+
 	if err != nil {
 		err = fmt.Errorf("error: %v url: %v", err, url)
 		fmt.Println(err)
@@ -283,5 +327,6 @@ func process(url string, c chan error, encoder *json.Encoder, o ...Option) {
 		c <- err
 	}
 
-	c <- err
+	c <- nil
+
 }
