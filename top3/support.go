@@ -53,7 +53,8 @@ func upCount(s string) int {
 	return count
 }
 
-func lineCounter(fileName string) (int, error) {
+// lineCounter считает количество строк в файле
+func lineCounter(fileName string) (uint, error) {
 
 	file, err := os.Open(fileName)
 	if err != nil {
@@ -63,7 +64,7 @@ func lineCounter(fileName string) (int, error) {
 
 	reader := bufio.NewReader(file)
 
-	var count int
+	var count uint
 
 	for {
 
@@ -80,4 +81,18 @@ func lineCounter(fileName string) (int, error) {
 		}
 
 	}
+}
+
+// readln считывает следующую строку из файла
+func readln(r *bufio.Reader) (string, error) {
+	var (
+		isPrefix bool  = true
+		err      error = nil
+		line, ln []byte
+	)
+	for isPrefix && err == nil {
+		line, isPrefix, err = r.ReadLine()
+		ln = append(ln, line...)
+	}
+	return string(ln), err
 }
