@@ -177,23 +177,22 @@ func URL(url string, o ...Option) (Result, error) {
 		opt(options)
 	}
 	fmt.Printf("REQUEST %v \n", url)
-
 	// Отправляем запрос
 	resp, err := getResponceBody(url, WithClient(options.Client), WithHostReqLimit(options.HostReqLimit), withHosts(options.hosts))
 	if err != nil {
-		return Result{}, err
+		return Result{Url: url}, err
 	}
 
 	// Получаем текст из запроса
 	text, err := extractText(resp, options.Tags...)
 	if err != nil {
-		return Result{}, err
+		return Result{Url: url}, err
 	}
 
 	// Получаем топ 3 слова
 	words, count, err := GetPopularWords(text)
 	if err != nil {
-		return Result{}, err
+		return Result{Url: url}, err
 	}
 
 	result := Result{Url: url, Count: count, Words: words}
@@ -213,11 +212,6 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	// TODO: сделать более точную настройку клиента
 	if options.Client.Timeout == 0 {
 		options.Client.Timeout = 5 * time.Second
-	}
-
-	// Количество воркеров по умолчанию
-	if options.Workers == 0 {
-		options.Workers = 2
 	}
 
 	// Если задан лимит запросов на хост
@@ -245,7 +239,6 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	if err != nil {
 		return err
 	}
-	defer resultFile.Close()
 
 	// Инициализируем енкодер
 	encoder := json.NewEncoder(resultFile)
@@ -255,33 +248,43 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	if err != nil {
 		return err
 	}
-
-	// Инициализируем сканер
-	scanner := bufio.NewScanner(urlFile)
+	rowCount *= 2
 
 	// Инициализируем каналы для ошибок и урлов
 	errChan := make(chan error, rowCount)
-	urlChan := make(chan string, rowCount)
+	resultChan := make(chan Result, rowCount)
 
-	// Запускаем воркеры
-	var w uint
-	for w < options.Workers {
-		go worker(urlChan, errChan, encoder, o...)
-		w += 1
-	}
+	defer close(resultChan)
+	defer close(errChan)
 
-	// Проходимся по всем урлам в файле, для каждого определяем топ 3
-	for scanner.Scan() {
-		url := scanner.Text()
-		// Если была обнаружена ошибка при считывании
-		err := scanner.Err()
-		if err != nil {
-			return err
+	// Стандартный режим
+	if options.Workers == 0 {
+		go writeWorker(resultChan, errChan, encoder)
+		scanner := bufio.NewScanner(urlFile)
+		for scanner.Scan() {
+			url := scanner.Text()
+			err := scanner.Err()
+			if err != nil {
+				return err
+			}
+			go process(url, resultChan, errChan, o...)
 		}
-		urlChan <- url
+		// Режим с воркерами
+	} else {
+		// Инициализируем ридер
+		reader := bufio.NewReader(urlFile)
+		// Запускаем воркеры
+		var w uint
+		for w < options.Workers {
+			// Воркер для считывания и обработки
+			go processWorker(resultChan, errChan, reader, o...)
+			// Воркер для записи
+			go writeWorker(resultChan, errChan, encoder)
+			w += 1
+		}
 	}
-	close(urlChan)
-	// Ждём выполнения всех процессов
+
+	// Ждём выполнения всех процессов и воркеров
 	for {
 		err = <-errChan
 		if err != nil {
@@ -292,41 +295,19 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 			break
 		}
 	}
-	close(errChan)
+
 	return nil
 }
 
-func worker(urlChan chan string, errChan chan error, encoder *json.Encoder, o ...Option) {
-	for {
-		url, ok := <-urlChan
-		if !ok {
-			break
-		}
-		go process(url, errChan, encoder, o...)
-	}
-}
+// process обёртка для top3.URL с каналами resultChan и errChan
+func process(url string, resultChan chan Result, errChan chan error, o ...Option) {
 
-func process(url string, c chan error, encoder *json.Encoder, o ...Option) {
-	// Получаем результат
-	var result Result
-	var err error
-
-	result, err = URL(url, o...)
-
+	result, err := URL(url, o...)
 	if err != nil {
-		err = fmt.Errorf("error: %v url: %v", err, url)
-		fmt.Println(err)
-		c <- err
+		errChan <- err
+		return
 	}
 
-	// Записываем результат
-	err = encoder.Encode(result)
-	if err != nil {
-		err = fmt.Errorf("error: %v url: %v", err, url)
-		fmt.Println(err)
-		c <- err
-	}
-
-	c <- nil
-
+	resultChan <- result
+	errChan <- nil
 }
