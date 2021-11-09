@@ -7,14 +7,27 @@ import (
 	"time"
 )
 
-func exampleTopFile() {
-	err := top3.ForFile("url.txt", "result.json", top3.WithTags([]string{"p", "a"}))
+func exampleForFile() {
+	start := time.Now()
+	err := top3.ForFile("url.txt", "result.json")
 	if err != nil {
 		panic(err)
 	}
+	since := time.Since(start)
+	fmt.Println("Без воркеров", since)
 }
 
-func exampleTopURL() {
+func exampleForFileWithWorkers() {
+	start := time.Now()
+	err := top3.ForFile("url.txt", "result.json", top3.WithWorkers(3))
+	if err != nil {
+		panic(err)
+	}
+	since := time.Since(start)
+	fmt.Println("С воркерами", since)
+}
+
+func exampleURL() {
 	result, err := top3.URL("https://habr.com/ru/feed/")
 	if err != nil {
 		panic(err)
@@ -25,10 +38,11 @@ func exampleTopURL() {
 func main() {
 	// Используем 1 ядро процессора
 	runtime.GOMAXPROCS(1)
-	// Для измерения времени
-	start := time.Now()
-	exampleTopFile()
-	exampleTopURL()
+
+	exampleForFile()
+	exampleForFileWithWorkers()
+
+	exampleURL()
 	// Вывод затраченного времени
-	fmt.Printf("Time spend: %v", time.Since(start))
+
 }
