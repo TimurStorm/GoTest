@@ -80,8 +80,8 @@ func WithWorkers(w uint) Option {
 	}
 }
 
-// GetPopularWords возвращает топ 3 слов текста по упоминаниям и их количество
-func GetPopularWords(text string) ([3]string, [3]int, error) {
+// ForText возвращает топ 3 слов текста по упоминаниям и их количество
+func ForText(text string) ([3]string, [3]int, error) {
 
 	// Итоговые топ 3 слова
 	var resWords [3]string
@@ -190,7 +190,7 @@ func URL(url string, o ...Option) (Result, error) {
 	}
 
 	// Получаем топ 3 слова
-	words, count, err := GetPopularWords(text)
+	words, count, err := ForText(text)
 	if err != nil {
 		return Result{Url: url}, err
 	}
