@@ -30,7 +30,8 @@ type AllOptions struct {
 	Tags           []string
 	Client         http.Client
 	hosts          *hosts
-	Workers        uint
+	WriteWorkers   uint
+	ProcessWorkers uint
 	HostReqLimit   uint
 	AttemptCount   uint
 	AttemptTimeout time.Duration
@@ -74,9 +75,15 @@ func WithAttemptTimeout(t time.Duration) Option {
 	}
 }
 
-func WithWorkers(w uint) Option {
+func WithWriteWorkers(w uint) Option {
 	return func(opts *AllOptions) {
-		opts.Workers = w
+		opts.WriteWorkers = w
+	}
+}
+
+func WithProcessWorkers(w uint) Option {
+	return func(opts *AllOptions) {
+		opts.ProcessWorkers = w
 	}
 }
 
@@ -214,6 +221,10 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 		options.Client.Timeout = 5 * time.Second
 	}
 
+	if options.WriteWorkers == 0 {
+		options.WriteWorkers = 1
+	}
+
 	// Если задан лимит запросов на хост
 	if options.HostReqLimit != 0 {
 		options.hosts = &hosts{MapMutex: new(sync.RWMutex), Map: make(map[string]uint)}
@@ -257,9 +268,17 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	defer close(resultChan)
 	defer close(errChan)
 
-	// Стандартный режим
-	if options.Workers == 0 {
+	// Запускаем воркеры для записи, по умолчанию 1
+	var w uint
+
+	for w < options.WriteWorkers {
+		// Воркер для записи
 		go writeWorker(resultChan, errChan, encoder)
+		w += 1
+	}
+
+	// Стандартный режим
+	if options.ProcessWorkers == 0 {
 		scanner := bufio.NewScanner(urlFile)
 		for scanner.Scan() {
 			url := scanner.Text()
@@ -275,11 +294,9 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 		reader := bufio.NewReader(urlFile)
 		// Запускаем воркеры
 		var w uint
-		for w < options.Workers {
+		for w < options.ProcessWorkers {
 			// Воркер для считывания и обработки
 			go processWorker(resultChan, errChan, reader, o...)
-			// Воркер для записи
-			go writeWorker(resultChan, errChan, encoder)
 			w += 1
 		}
 	}

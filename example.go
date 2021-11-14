@@ -19,7 +19,7 @@ func exampleForFile() {
 
 func exampleForFileWithWorkers() {
 	start := time.Now()
-	err := top3.ForFile("url.txt", "result.json", top3.WithWorkers(3))
+	err := top3.ForFile("url.txt", "result.json", top3.WithWriteWorkers(3), top3.WithProcessWorkers(2))
 	if err != nil {
 		panic(err)
 	}
