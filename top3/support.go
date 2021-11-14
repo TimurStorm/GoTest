@@ -8,18 +8,27 @@ import (
 	"unicode"
 )
 
-// spliter разделяет строку s по разделителям из splits
-func spliter(s string, splits string) []string {
-	m := make(map[rune]int)
-	for _, r := range splits {
-		m[r] = 1
+// spliter разделяет строку s по всем разделителям из " -.,?!()<>_"
+func spliter(s string) []string {
+	var (
+		result []string
+		index  int
+	)
+	for {
+		index = strings.IndexAny(s, " -.,?!()<>_")
+		if index == -1 {
+			break
+		}
+		word := s[:index]
+		if word != "" {
+			result = append(result, word)
+		}
+		s = s[index+1:]
 	}
-
-	splitter := func(r rune) bool {
-		return m[r] == 1
+	if s != "" {
+		result = append(result, s)
 	}
-
-	return strings.FieldsFunc(s, splitter)
+	return result
 }
 
 // isWord проверка на слово

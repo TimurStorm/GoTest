@@ -76,7 +76,7 @@ func getRating(text string) (map[int][]string, int) {
 	result := make(map[int][]string)
 
 	// Получаем все слова из текста
-	allWords := spliter(text, " -.,?!()<>_")
+	allWords := spliter(text)
 
 	// Наибольшее количество упомянаний
 	var maxCount int = 0
