@@ -90,31 +90,32 @@ func WithProcessWorkers(w uint) Option {
 // ForText возвращает топ 3 слов текста по упоминаниям и их количество
 func ForText(text string) ([3]string, [3]int, error) {
 
-	// Итоговые топ 3 слова
-	var resWords [3]string
-
-	// Итоговое число упомянаний топ 3 слов
-	var resCount [3]int
+	// Результат
+	var (
+		words [3]string
+		count [3]int
+	)
 
 	// Определяем популярные слова и максимальное их значение
-	wordCount, maxCount := getRating(text)
+	rating, max := getRating(text)
 
 	// Отбираем топ 3 слова
-	for nodeCount := 0; nodeCount < 3 && maxCount != 0; {
-		if _, ok := wordCount[maxCount]; ok {
-			for _, word := range wordCount[maxCount] {
-				if nodeCount == 3 {
+	// node - количество записей ( не больше 3)
+	for node := 0; node < 3 && max != 0; {
+		if _, ok := rating[max]; ok {
+			for _, word := range rating[max] {
+				if node == 3 {
 					break
 				}
-				resWords[nodeCount] = word
-				resCount[nodeCount] = maxCount
-				nodeCount++
+				words[node] = word
+				count[node] = max
+				node++
 			}
 		}
-		maxCount--
+		max--
 	}
 
-	return resWords, resCount, nil
+	return words, count, nil
 }
 
 // extractText возвращает текст запроса
@@ -210,20 +211,16 @@ func URL(url string, o ...Option) (Result, error) {
 // ForFile сканирует файл urlFileName и для каждого url производит URL. Результат записывается в resultFileName
 func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	// Считываем опции
-	options := &AllOptions{}
+	options := &AllOptions{
+		Client:       http.Client{Timeout: 5 * time.Second},
+		WriteWorkers: 1,
+	}
 	for _, opt := range o {
 		opt(options)
 	}
 
 	// Таймаут по умолчанию
 	// TODO: сделать более точную настройку клиента
-	if options.Client.Timeout == 0 {
-		options.Client.Timeout = 5 * time.Second
-	}
-
-	if options.WriteWorkers == 0 {
-		options.WriteWorkers = 1
-	}
 
 	// Если задан лимит запросов на хост
 	if options.HostReqLimit != 0 {
