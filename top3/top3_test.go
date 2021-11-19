@@ -86,9 +86,9 @@ var TestTex = []TestWords{
 	},
 }
 
-func TestGetPopularWords(t *testing.T) {
+func TestForText(t *testing.T) {
 	for index, test := range TestTex {
-		words, count, err := GetPopularWords(test.Text)
+		words, count, err := ForText(test.Text)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -103,7 +103,7 @@ func TestGetPopularWords(t *testing.T) {
 
 func TestURL(t *testing.T) {
 	for _, test := range TestUrls {
-		top, err := URL(test.Url)
+		top, err := ForPage(test.Url)
 		if err != nil {
 			fmt.Println(err)
 		}

@@ -122,11 +122,6 @@ func ForText(text string) ([3]string, [3]int, error) {
 func extractText(responceData []byte, tags ...string) (string, error) {
 	// Результат
 	var result string
-	// Теги
-	var t []string
-	if len(tags) > 0 {
-		t = tags
-	}
 
 	// Ошибка извлечения тектса из тега
 	var divErr error
@@ -149,7 +144,7 @@ func extractText(responceData []byte, tags ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if strings.Contains(bodyHTML, "div") && len(t) > 0 {
+	if strings.Contains(bodyHTML, "div") && len(tags) > 0 {
 		tagFilter := func(html string) {
 			if !(strings.Contains(html, "div")) && !(strings.Contains(html, "script")) {
 				err = textFrom(html)
@@ -159,7 +154,7 @@ func extractText(responceData []byte, tags ...string) (string, error) {
 			}
 		}
 		// Для каждого тега в файле получаем его html-вёрстку, из которой получаем текст
-		for _, tag := range t {
+		for _, tag := range tags {
 			doc.Find(tag).Each(func(index int, item *goquery.Selection) {
 				html, err := item.Html()
 				if err != nil {
@@ -178,8 +173,8 @@ func extractText(responceData []byte, tags ...string) (string, error) {
 	return result, nil
 }
 
-// URL возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
-func URL(url string, o ...Option) (Result, error) {
+// ForPage возвращает результат с топ-3 наиболее упоминаемых слов и их количеством на странице сайта
+func ForPage(url string, o ...Option) (Result, error) {
 	options := &AllOptions{}
 	for _, opt := range o {
 		opt(options)
@@ -316,7 +311,7 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 // process обёртка для top3.URL с каналами resultChan и errChan
 func process(url string, resultChan chan Result, errChan chan error, o ...Option) {
 
-	result, err := URL(url, o...)
+	result, err := ForPage(url, o...)
 	if err != nil {
 		errChan <- err
 		return

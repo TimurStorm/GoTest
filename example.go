@@ -28,7 +28,7 @@ func exampleForFileWithWorkers() {
 }
 
 func exampleURL() {
-	result, err := top3.URL("https://habr.com/ru/feed/")
+	result, err := top3.ForPage("https://habr.com/ru/feed/")
 	if err != nil {
 		panic(err)
 	}

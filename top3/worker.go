@@ -21,7 +21,7 @@ func processWorker(resultChan chan Result, errChan chan error, reader *bufio.Rea
 			return
 		}
 
-		result, err := URL(url, o...)
+		result, err := ForPage(url, o...)
 
 		if err != nil {
 			err = fmt.Errorf("error: %v url: %v", err, url)
