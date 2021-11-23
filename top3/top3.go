@@ -207,8 +207,9 @@ func ForPage(url string, o ...Option) (Result, error) {
 func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 	// Считываем опции
 	options := &AllOptions{
-		Client:       http.Client{Timeout: 5 * time.Second},
-		WriteWorkers: 1,
+		Client:         http.Client{Timeout: 5 * time.Second},
+		WriteWorkers:   1,
+		ProcessWorkers: 1,
 	}
 	for _, opt := range o {
 		opt(options)
@@ -255,68 +256,56 @@ func ForFile(urlFileName string, resultFileName string, o ...Option) error {
 
 	// Инициализируем каналы для ошибок и урлов
 	errChan := make(chan error, rowCount)
+	urlProcessChan := make(chan string)
+	urlDownloadChan := make(chan string)
+	wgDone := make(chan bool)
 	resultChan := make(chan Result, rowCount)
 
-	defer close(resultChan)
-	defer close(errChan)
-
 	// Запускаем воркеры для записи, по умолчанию 1
+	go writeWorker(resultChan, errChan, encoder)
+
+	// Инициализируем ридер
+	scanner := bufio.NewScanner(urlFile)
 	var w uint
+	var wg sync.WaitGroup
 
-	for w < options.WriteWorkers {
-		// Воркер для записи
-		go writeWorker(resultChan, errChan, encoder)
-		w += 1
+	// Запуск воркеров-процессов
+	for w = 0; w < options.ProcessWorkers; w++ {
+		wg.Add(2)
+		bytesDownloadChan := make(chan []byte)
+		go func() {
+			processWorker(resultChan, errChan, urlProcessChan, bytesDownloadChan, o...)
+			wg.Done()
+		}()
+		go func() {
+			downloadWorker(bytesDownloadChan, urlDownloadChan, errChan, &options.Client)
+			wg.Done()
+		}()
 	}
-
-	// Стандартный режим
-	if options.ProcessWorkers == 0 {
-		scanner := bufio.NewScanner(urlFile)
-		for scanner.Scan() {
-			url := scanner.Text()
-			err := scanner.Err()
-			if err != nil {
-				return err
-			}
-			go process(url, resultChan, errChan, o...)
-		}
-		// Режим с воркерами
-	} else {
-		// Инициализируем ридер
-		reader := bufio.NewReader(urlFile)
-		// Запускаем воркеры
-		var w uint
-		for w < options.ProcessWorkers {
-			// Воркер для считывания и обработки
-			go processWorker(resultChan, errChan, reader, o...)
-			w += 1
-		}
-	}
-
-	// Ждём выполнения всех процессов и воркеров
-	for {
-		err = <-errChan
+	for scanner.Scan() {
+		url := scanner.Text()
+		err = scanner.Err()
 		if err != nil {
 			return err
 		}
-		rowCount -= 1
-		if rowCount == 0 {
-			break
-		}
+		urlDownloadChan <- url
+		urlProcessChan <- url
+	}
+	close(urlDownloadChan)
+	close(urlProcessChan)
+
+	go func() {
+		wg.Wait()
+		close(wgDone)
+	}()
+
+	select {
+	case <-wgDone:
+		break
+	case err := <-errChan:
+		close(errChan)
+		return err
 	}
 
 	return nil
-}
-
-// process обёртка для top3.URL с каналами resultChan и errChan
-func process(url string, resultChan chan Result, errChan chan error, o ...Option) {
-
-	result, err := ForPage(url, o...)
-	if err != nil {
-		errChan <- err
-		return
-	}
-
-	resultChan <- result
-	errChan <- nil
 }
