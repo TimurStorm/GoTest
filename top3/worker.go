@@ -57,35 +57,37 @@ func processWorker(resultChan chan Result, errChan chan error, urlChan chan stri
 				w = strings.ToLower(w)
 				// Проверяем строку на количество символов и является ли она словом
 				if utf8.RuneCountInString(w) > 3 && isWord(w) {
+					// Считаем количество упомянаний
 					rating[w] += 1
 				} else {
 					continue
 				}
 
-				// Если количество упомянаний этого слова больше максимума
-				if rating[w] > result.Count[0] {
-					// 1, 2, 3 -> new, 1, 2
-					result.Count[1], result.Count[2] = result.Count[0], result.Count[1]
-					result.Words[1], result.Words[2] = result.Words[0], result.Words[1]
+				changed := false
 
-					result.Count[0] = rating[w]
-					result.Words[0] = w
-					continue
-					// Если количество упомянаний этого слова больше 2-ого максимума
-				} else if rating[w] > result.Count[1] {
-					// 1, 2, 3 -> 1, new, 2
-					result.Count[2] = result.Count[1]
-					result.Words[2] = result.Words[1]
+				for index, value := range result.Words {
+					if value == w && value != "" {
+						result.Count[index] += 1
+						changed = true
+						break
+					}
+				}
 
-					result.Count[1] = rating[w]
-					result.Words[1] = w
+				if changed {
 					continue
-					// Если количество упомянаний этого слова больше 3-ого максимума
-				} else if rating[w] > result.Count[2] {
-					// 1, 2, 3 -> 1, 2, new
+				}
+
+				if rating[w] > result.Count[2] {
 					result.Count[2] = rating[w]
 					result.Words[2] = w
-					continue
+				}
+				if result.Count[2] > result.Count[1] {
+					result.Count[1], result.Count[2] = result.Count[2], result.Count[1]
+					result.Words[1], result.Words[2] = result.Words[2], result.Words[1]
+				}
+				if result.Count[1] > result.Count[0] {
+					result.Count[0], result.Count[1] = result.Count[1], result.Count[0]
+					result.Words[0], result.Words[1] = result.Words[1], result.Words[0]
 				}
 			}
 
@@ -142,21 +144,20 @@ func downloadWorker(byteChan chan []byte, urlChan chan string, errChan chan erro
 
 		// Инициализируем ридер
 		reader := bufio.NewReader(res.Body)
-
 		for {
 			// Считываем построчно тело запроса
 			bytes, err := reader.ReadBytes('\n')
+			if err != nil && err != io.EOF {
+				errChan <- err
+				return
+			}
+			// Отправляем байты в processWorker
+			byteChan <- bytes
 			if err == io.EOF {
 				byteChan <- nil
 				break
 			}
-			if err != nil {
-				errChan <- err
-				return
-			}
 
-			// Отправляем байты в processWorker
-			byteChan <- bytes
 		}
 	}
 }
