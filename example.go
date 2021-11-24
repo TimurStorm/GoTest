@@ -27,22 +27,12 @@ func exampleForFileWithWorkers() {
 	fmt.Println("С воркерами", since)
 }
 
-func exampleURL() {
-	result, err := top3.ForPage("https://habr.com/ru/feed/")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(result)
-}
-
 func main() {
 	// Используем 1 ядро процессора
 	runtime.GOMAXPROCS(1)
 
 	exampleForFile()
 	exampleForFileWithWorkers()
-
-	exampleURL()
 	// Вывод затраченного времени
 
 }

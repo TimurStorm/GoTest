@@ -1,11 +1,8 @@
-package top3
+package worker
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"main/support"
 	"strings"
 	"unicode/utf8"
 
@@ -13,7 +10,7 @@ import (
 )
 
 // processWorker воркер для считывания урла и запуска top3.URL
-func processWorker(resultChan chan Result, errChan chan error, urlChan chan string, downloadChan chan []byte, o ...Option) {
+func Process(resultChan chan Result, errChan chan error, urlChan chan string, downloadChan chan []byte, tags ...string) {
 	for {
 		// Получаем url из main горутины
 		url, isOpen := <-urlChan
@@ -33,7 +30,7 @@ func processWorker(resultChan chan Result, errChan chan error, urlChan chan stri
 			}
 
 			// Достаём из части текст
-			text, err := extractText(bytes)
+			text, err := support.ExtractText(bytes)
 			if err != nil {
 				err = fmt.Errorf("error: %v url: %v", err, url)
 				errChan <- err
@@ -41,11 +38,11 @@ func processWorker(resultChan chan Result, errChan chan error, urlChan chan stri
 			}
 
 			// Дробим текст на слова
-			words := spliter(text)
+			words := support.Spliter(text)
 
 			// Проходимся по всем словам и считаем их количество
 			for _, w := range words {
-				var up = upCount(w)
+				var up = support.UpCount(w)
 				// Если заглавных букв больше 1 и это не абривиатура
 				if up > 1 && up != utf8.RuneCountInString(w) {
 
@@ -56,7 +53,7 @@ func processWorker(resultChan chan Result, errChan chan error, urlChan chan stri
 				}
 				w = strings.ToLower(w)
 				// Проверяем строку на количество символов и является ли она словом
-				if utf8.RuneCountInString(w) > 3 && isWord(w) {
+				if utf8.RuneCountInString(w) > 3 && support.IsWord(w) {
 					// Считаем количество упомянаний
 					rating[w] += 1
 				} else {
@@ -95,69 +92,5 @@ func processWorker(resultChan chan Result, errChan chan error, urlChan chan stri
 
 		// Отправляем результат writeWorker горутине
 		resultChan <- result
-	}
-}
-
-// writeWorker воркер для записи данных
-func writeWorker(resultChan chan Result, errChan chan error, encoder *json.Encoder) {
-	for {
-		// Ждём результат
-		result, isOpen := <-resultChan
-		if !isOpen {
-			break
-		}
-
-		// Производим запись
-		err := encoder.Encode(result)
-		if err != nil {
-			err = fmt.Errorf("error: %v url: %v", err, result.Url)
-			fmt.Println(err)
-			errChan <- err
-			return
-		}
-	}
-}
-
-func downloadWorker(byteChan chan []byte, urlChan chan string, errChan chan error, client *http.Client) {
-
-	for {
-		// Получаем урл
-		url, isOpen := <-urlChan
-		if !isOpen {
-			break
-		}
-
-		// Формируем запрос
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			errChan <- err
-			return
-		}
-
-		// Отпарвляем запрос
-		res, err := client.Do(req)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		defer res.Body.Close()
-
-		// Инициализируем ридер
-		reader := bufio.NewReader(res.Body)
-		for {
-			// Считываем построчно тело запроса
-			bytes, err := reader.ReadBytes('\n')
-			if err != nil && err != io.EOF {
-				errChan <- err
-				return
-			}
-			// Отправляем байты в processWorker
-			byteChan <- bytes
-			if err == io.EOF {
-				byteChan <- nil
-				break
-			}
-
-		}
 	}
 }
